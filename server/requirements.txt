@@ -1,0 +1,25 @@
+# ===== PDF Chat AI — Backend Dependencies =====
+
+# Core
+fastapi[standard]
+uvicorn[standard]
+
+# Database
+sqlalchemy[asyncio]
+asyncpg
+
+# Configuration
+pydantic-settings
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Cache & Sessions
+redis[hiredis]
+
+# File Upload
+python-multipart
+
+# Database Migrations
+alembic
