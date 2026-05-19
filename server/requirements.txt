@@ -14,6 +14,7 @@ pydantic-settings
 # Authentication & Security
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 
 # Cache & Sessions
 redis[hiredis]

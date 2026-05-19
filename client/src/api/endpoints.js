@@ -32,6 +32,7 @@ export const PDFS = {
   GET: (id) => `/pdfs/${id}`,
   DELETE: (id) => `/pdfs/${id}`,
   ATTACH: (chatId) => `/chats/${chatId}/pdfs`,
+  VIEW: (id) => `/pdfs/${id}/view`,
 };
 
 export const MODELS = {

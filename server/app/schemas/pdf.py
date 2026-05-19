@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from uuid import UUID
 
@@ -10,7 +10,7 @@ class PdfResponse(BaseModel):
     file_size_bytes: int
     page_count: int
     uploaded_at: datetime
-    metadata: dict | None = None
+    metadata: dict | None = Field(None, validation_alias="metadata_")
 
     model_config = {"from_attributes": True}
 

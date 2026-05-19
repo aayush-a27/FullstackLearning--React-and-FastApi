@@ -1,6 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import axiosInstance from '../api/axiosInstance';
 import { CHATS, MESSAGES } from '../api/endpoints';
+import { setPdfs, clearPdfs } from '../features/pdf/pdfSlice';
 import {
   setChats,
   setLoadingChats,
@@ -26,14 +27,17 @@ export function useChat() {
     isLoadingMessages,
     error,
   } = useSelector((state) => state.chat);
+  const { pdfs } = useSelector((state) => state.pdf);
 
   const fetchChats = async () => {
     try {
       dispatch(setLoadingChats(true));
       const { data } = await axiosInstance.get(CHATS.LIST);
       dispatch(setChats(data));
+      return data;
     } catch (err) {
       dispatch(setChatError(err.response?.data?.detail || 'Failed to load chats'));
+      return null;
     }
   };
 
@@ -64,20 +68,46 @@ export function useChat() {
 
   const selectChat = async (chatId) => {
     dispatch(setActiveChat(chatId));
+    
+    // Sync PDFs for the selected chat
+    const chat = chats.find(c => c.id === chatId);
+    if (chat && chat.pdf_documents) {
+      dispatch(setPdfs(chat.pdf_documents));
+    } else {
+      dispatch(clearPdfs());
+    }
+
     try {
-      dispatch(setLoadingMessages(true));
-      const { data } = await axiosInstance.get(MESSAGES.LIST(chatId));
-      dispatch(setMessages(data));
+      if (chatId) {
+        dispatch(setLoadingMessages(true));
+        const { data } = await axiosInstance.get(MESSAGES.LIST(chatId));
+        dispatch(setMessages(data));
+      } else {
+        dispatch(setMessages([]));
+      }
     } catch (err) {
       dispatch(setChatError(err.response?.data?.detail || 'Failed to load messages'));
     }
   };
 
   const sendMessage = async (chatId, content, modelId) => {
+    let targetChatId = chatId;
+
+    // Create chat on the fly if it doesn't exist
+    if (!targetChatId) {
+      dispatch(setStreaming(true));
+      const newChat = await createChat(content.slice(0, 30) + (content.length > 30 ? '...' : ''), pdfs.map(p => p.id));
+      if (!newChat) {
+        dispatch(setStreaming(false));
+        return; // createChat handles error toast
+      }
+      targetChatId = newChat.id;
+    }
+
     // Add user message immediately
     const userMsg = {
       id: crypto.randomUUID(),
-      chat_id: chatId,
+      chat_id: targetChatId,
       role: 'user',
       content,
       created_at: new Date().toISOString(),
@@ -87,7 +117,7 @@ export function useChat() {
     // Add placeholder for AI response
     const aiPlaceholder = {
       id: crypto.randomUUID(),
-      chat_id: chatId,
+      chat_id: targetChatId,
       role: 'assistant',
       content: '',
       model_used: modelId,
@@ -97,7 +127,7 @@ export function useChat() {
     dispatch(setStreaming(true));
 
     try {
-      const { data } = await axiosInstance.post(MESSAGES.SEND(chatId), {
+      const { data } = await axiosInstance.post(MESSAGES.SEND(targetChatId), {
         content,
         model_id: modelId,
       });

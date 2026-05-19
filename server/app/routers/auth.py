@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.auth import LoginRequest, RegisterRequest, AuthResponse
 from app.schemas.user import UserResponse
+from app.config import get_settings
 from app.services.auth_service import (
     authenticate_user,
     create_user,
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: RegisterRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Register a new user account."""
@@ -52,6 +54,16 @@ async def register(
     # Generate tokens
     tokens = generate_tokens(user)
 
+    # Set HTTP-only refresh token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=tokens["refresh_token"],
+        httponly=True,
+        secure=False,  # Set True in production (HTTPS)
+        samesite="lax",
+        max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
+
     return AuthResponse(
         access_token=tokens["access_token"],
         user=UserResponse.model_validate(user).model_dump(mode="json"),
@@ -61,6 +73,7 @@ async def register(
 @router.post("/login", response_model=AuthResponse)
 async def login(
     request: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Authenticate a user and return tokens."""
@@ -73,6 +86,16 @@ async def login(
 
     tokens = generate_tokens(user)
 
+    # Set HTTP-only refresh token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=tokens["refresh_token"],
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
+
     return AuthResponse(
         access_token=tokens["access_token"],
         user=UserResponse.model_validate(user).model_dump(mode="json"),
@@ -83,23 +106,59 @@ async def login(
 async def logout(
     current_user: User = Depends(get_current_user),
 ):
-    """Logout the current user by blacklisting their token."""
+    """Logout the current user by blacklisting their token and clearing cookies."""
     # Note: Token blacklisting requires Redis to be running
     # In dev without Redis, logout just returns success
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(key="refresh_token")
+    return response
 
 
 @router.post("/refresh", response_model=dict)
 async def refresh_token(
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Refresh an access token.
-    In production, the refresh token would come from an httpOnly cookie.
-    For now, this is a placeholder endpoint.
+    Refresh an access token using an httpOnly cookie.
     """
-    # TODO: Implement refresh token logic with httpOnly cookies
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Token refresh not yet implemented. Use login to get a new token.",
-    )
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
+
+    payload = decode_token(refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token payload",
+        )
+
+    import uuid
+    from app.services.auth_service import get_user_by_id
+    from app.core.security import create_access_token
+    
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID format")
+
+    user = await get_user_by_id(db, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+
+    # Generate a new access token
+    new_access_token = create_access_token({"sub": str(user.id), "email": user.email})
+    return {"access_token": new_access_token}

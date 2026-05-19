@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from uuid import UUID
 
@@ -14,7 +14,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     model_used: str | None = None
-    metadata: dict | None = None
+    metadata: dict | None = Field(None, validation_alias="metadata_")
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -12,7 +12,7 @@ export default function ChatInput() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!message.trim() || !activeChatId || isStreaming) return;
+    if (!message.trim() || isStreaming) return;
     sendMessage(activeChatId, message.trim(), selectedModel?.id);
     setMessage('');
   };
@@ -25,7 +25,7 @@ export default function ChatInput() {
   };
 
   return (
-    <div className="px-4 pb-4">
+    <div className="px-3 pb-3 flex-shrink-0">
       {/* PDF Uploader (toggle) */}
       {showUploader && (
         <div className="mb-3 animate-slide-up">
@@ -36,17 +36,18 @@ export default function ChatInput() {
       {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        className="max-w-3xl mx-auto flex items-end gap-2 glass rounded-2xl p-2 border border-glass-border focus-within:border-primary-500/30 transition-colors"
+        className="flex items-end gap-2 glass rounded-2xl p-2 border border-glass-border focus-within:border-primary-500/30 transition-colors"
       >
         {/* Attach PDF button */}
         <button
           type="button"
           id="attach-pdf-btn"
           onClick={() => setShowUploader(!showUploader)}
-          className="p-2.5 rounded-xl hover:bg-primary-500/10 text-text-muted hover:text-primary-400 transition-colors flex-shrink-0"
+          disabled={isStreaming}
+          className="p-2 rounded-xl hover:bg-primary-500/10 text-text-muted hover:text-primary-400 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Attach PDF"
         >
-          <Paperclip size={20} />
+          <Paperclip size={18} />
         </button>
 
         {/* Text input */}
@@ -55,33 +56,36 @@ export default function ChatInput() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={activeChatId ? 'Ask about your PDF...' : 'Select or create a chat first'}
-          disabled={!activeChatId || isStreaming}
+          placeholder="Ask anything about your PDF..."
+          disabled={isStreaming}
           rows={1}
-          className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none py-2.5 max-h-32 disabled:opacity-50"
-          style={{ minHeight: '40px' }}
+          className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none py-2 max-h-28 disabled:opacity-50"
+          style={{ minHeight: '36px' }}
         />
 
         {/* Send button */}
         <button
           type="submit"
           id="send-message-btn"
-          disabled={!message.trim() || !activeChatId || isStreaming}
-          className="p-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 active:scale-95 flex-shrink-0"
+          className={`p-2 rounded-xl transition-all duration-200 flex-shrink-0 ${
+            message.trim() && !isStreaming
+              ? 'bg-primary-600 hover:bg-primary-500 text-white shadow-md shadow-primary-500/20 active:scale-95'
+              : 'bg-glass-border/50 text-text-muted/50 cursor-not-allowed'
+          }`}
           aria-label="Send message"
         >
           {isStreaming ? (
-            <Loader2 size={20} className="animate-spin" />
+            <Loader2 size={18} className="animate-spin" />
           ) : (
-            <Send size={20} />
+            <Send size={18} />
           )}
         </button>
       </form>
 
       {/* Model indicator */}
-      <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5 mt-2">
-        <span className="text-lg">{selectedModel?.icon}</span>
-        <span className="text-xs text-text-muted">{selectedModel?.name}</span>
+      <div className="flex items-center justify-center gap-1.5 mt-1.5">
+        <span className="text-sm">{selectedModel?.icon}</span>
+        <span className="text-[10px] text-text-muted">{selectedModel?.name}</span>
       </div>
     </div>
   );

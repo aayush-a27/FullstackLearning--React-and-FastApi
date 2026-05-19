@@ -21,7 +21,7 @@ export default function RightSidebar() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewChat = () => {
-    createChat('New Chat');
+    selectChat(null);
   };
 
   return (

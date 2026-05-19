@@ -1,9 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  leftSidebarOpen: true,
-  rightSidebarOpen: true,
-  activeModal: null,       // 'profile' | 'settings' | 'upload' | null
+  // Panel order — determines left-to-right arrangement
+  panelOrder: ['history', 'pdfViewer', 'chat'],
+  // Panel widths as percentages (must sum to 100)
+  panelWidths: { history: 20, pdfViewer: 40, chat: 40 },
+  // Minimum panel width in pixels
+  minPanelWidth: 200,
+  // Drag-and-drop state
+  draggingPanel: null,       // panel id being dragged
+  dropTarget: null,          // panel id being hovered over
+  // Legacy (kept for Profile/Settings pages if needed)
+  activeModal: null,         // 'profile' | 'settings' | 'upload' | null
   isMobile: false,
 };
 
@@ -11,17 +19,25 @@ const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    toggleLeftSidebar(state) {
-      state.leftSidebarOpen = !state.leftSidebarOpen;
+    setPanelOrder(state, action) {
+      state.panelOrder = action.payload;
     },
-    toggleRightSidebar(state) {
-      state.rightSidebarOpen = !state.rightSidebarOpen;
+    swapPanels(state, action) {
+      const { fromIndex, toIndex } = action.payload;
+      const newOrder = [...state.panelOrder];
+      const temp = newOrder[fromIndex];
+      newOrder[fromIndex] = newOrder[toIndex];
+      newOrder[toIndex] = temp;
+      state.panelOrder = newOrder;
     },
-    setLeftSidebar(state, action) {
-      state.leftSidebarOpen = action.payload;
+    setPanelWidths(state, action) {
+      state.panelWidths = action.payload;
     },
-    setRightSidebar(state, action) {
-      state.rightSidebarOpen = action.payload;
+    setDraggingPanel(state, action) {
+      state.draggingPanel = action.payload;
+    },
+    setDropTarget(state, action) {
+      state.dropTarget = action.payload;
     },
     openModal(state, action) {
       state.activeModal = action.payload;
@@ -36,10 +52,11 @@ const uiSlice = createSlice({
 });
 
 export const {
-  toggleLeftSidebar,
-  toggleRightSidebar,
-  setLeftSidebar,
-  setRightSidebar,
+  setPanelOrder,
+  swapPanels,
+  setPanelWidths,
+  setDraggingPanel,
+  setDropTarget,
   openModal,
   closeModal,
   setMobile,

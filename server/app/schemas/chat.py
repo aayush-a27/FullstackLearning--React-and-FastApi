@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from uuid import UUID
+from app.schemas.pdf import PdfResponse
 
 
 class ChatCreate(BaseModel):
@@ -14,6 +15,10 @@ class ChatUpdate(BaseModel):
     smart_switch_enabled: bool | None = None
 
 
+class ChatAttachPdf(BaseModel):
+    pdf_id: UUID
+
+
 class ChatResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -21,6 +26,7 @@ class ChatResponse(BaseModel):
     active_model: str | None = None
     smart_switch_enabled: bool = True
     total_pdf_pages: int = 0
+    pdf_documents: list[PdfResponse] = []
     created_at: datetime
     updated_at: datetime
 

@@ -9,6 +9,7 @@ import {
   logout as logoutAction,
   completeOnboarding,
   updateUser,
+  setInitialized,
 } from '../features/auth/authSlice';
 import { ROUTES } from '../utils/constants';
 
@@ -88,7 +89,10 @@ export function useAuth() {
   const fetchUser = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      if (!token) return;
+      if (!token) {
+        dispatch(setInitialized());
+        return;
+      }
       const { data } = await axiosInstance.get(USERS.ME);
       dispatch(
         loginSuccess({
@@ -99,6 +103,8 @@ export function useAuth() {
     } catch {
       localStorage.removeItem('accessToken');
       dispatch(logoutAction());
+    } finally {
+      dispatch(setInitialized());
     }
   };
 

@@ -2,16 +2,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.chat import ChatCreate, ChatUpdate, ChatResponse
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.schemas.chat import ChatCreate, ChatUpdate, ChatResponse, ChatAttachPdf
 from app.services.chat_service import (
     get_user_chats,
     get_chat_by_id,
     create_chat,
     delete_chat,
     update_chat,
+    attach_pdf_to_chat,
 )
-from app.dependencies import get_current_user
-from app.models.user import User
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
@@ -89,3 +90,20 @@ async def delete_existing_chat(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Chat not found",
         )
+
+
+@router.post("/{chat_id}/pdfs", response_model=ChatResponse)
+async def attach_pdf(
+    chat_id: UUID,
+    data: ChatAttachPdf,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Attach an existing PDF to a chat."""
+    chat = await attach_pdf_to_chat(db, chat_id, current_user.id, data.pdf_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat or PDF not found",
+        )
+    return chat

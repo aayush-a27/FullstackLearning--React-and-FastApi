@@ -10,6 +10,7 @@ async def get_user_chats(db: AsyncSession, user_id: UUID) -> list[Chat]:
     """Get all chats for a user, ordered by most recent."""
     result = await db.execute(
         select(Chat)
+        .options(selectinload(Chat.pdf_documents))
         .where(Chat.user_id == user_id)
         .order_by(Chat.updated_at.desc())
     )
@@ -49,8 +50,7 @@ async def create_chat(
 
     db.add(chat)
     await db.flush()
-    await db.refresh(chat)
-    return chat
+    return await get_chat_by_id(db, chat.id, user_id)
 
 
 async def delete_chat(db: AsyncSession, chat_id: UUID, user_id: UUID) -> bool:
@@ -71,5 +71,30 @@ async def update_chat(db: AsyncSession, chat_id: UUID, user_id: UUID, **kwargs) 
         if value is not None and hasattr(chat, key):
             setattr(chat, key, value)
     await db.flush()
-    await db.refresh(chat)
-    return chat
+    return await get_chat_by_id(db, chat_id, user_id)
+
+
+async def attach_pdf_to_chat(db: AsyncSession, chat_id: UUID, user_id: UUID, pdf_id: UUID) -> Chat | None:
+    """Attach an existing PDF to a chat."""
+    chat = await get_chat_by_id(db, chat_id, user_id)
+    if not chat:
+        return None
+    
+    # Fetch PDF
+    result = await db.execute(
+        select(PdfDocument).where(
+            PdfDocument.id == pdf_id,
+            PdfDocument.user_id == user_id,
+        )
+    )
+    pdf = result.scalar_one_or_none()
+    if not pdf:
+        return None
+
+    # Check if already attached
+    if not any(p.id == pdf_id for p in chat.pdf_documents):
+        chat.pdf_documents.append(pdf)
+        chat.total_pdf_pages = sum(p.page_count for p in chat.pdf_documents)
+        await db.flush()
+        
+    return await get_chat_by_id(db, chat_id, user_id)

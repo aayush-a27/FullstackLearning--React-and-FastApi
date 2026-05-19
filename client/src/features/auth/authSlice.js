@@ -4,6 +4,7 @@ const initialState = {
   user: null,
   accessToken: null,
   isAuthenticated: false,
+  isInitialized: false,
   isLoading: false,
   error: null,
 };
@@ -45,6 +46,9 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    setInitialized(state) {
+      state.isInitialized = true;
+    },
   },
 });
 
@@ -56,6 +60,7 @@ export const {
   updateUser,
   completeOnboarding,
   clearError,
+  setInitialized,
 } = authSlice.actions;
 
 export default authSlice.reducer;

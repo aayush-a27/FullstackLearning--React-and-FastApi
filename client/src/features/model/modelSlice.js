@@ -6,7 +6,7 @@ const initialState = {
   smartSwitchEnabled: true,             // Smart switch on by default
   availableModels: AI_MODELS,
   modelHealth: {},                       // { 'openai': 'healthy', 'google': 'degraded', ... }
-  fallbackChain: ['gpt-4o', 'gemini-pro', 'claude-sonnet', 'gpt-4o-mini', 'llama-local'],
+  fallbackChain: ['gemini-pro', 'gemini-flash', 'groq-llama3'],
 };
 
 const modelSlice = createSlice({

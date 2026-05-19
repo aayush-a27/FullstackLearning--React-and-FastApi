@@ -16,6 +16,16 @@ async def lifespan(app: FastAPI):
     # === STARTUP ===
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
+    # Initialize Database Tables
+    from app.database import engine, Base
+    import app.models  # This ensures all models are imported before creating tables
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+
     # Initialize Redis (optional -- gracefully handle if not available)
     try:
         await init_redis()

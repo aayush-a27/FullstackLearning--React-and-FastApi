@@ -1,16 +1,26 @@
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useSelector, useDispatch } from 'react-redux';
-import { Upload, X, FileText, AlertCircle } from 'lucide-react';
-import { addPdf, setUploading, setUploadProgress, setPdfError } from '../../features/pdf/pdfSlice';
+import { Upload, X, FileText, AlertCircle, Trash2 } from 'lucide-react';
+import { addPdf, setUploading, setUploadProgress, setPdfError, removePdf } from '../../features/pdf/pdfSlice';
 import { canAddPdf, formatFileSize } from '../../utils/helpers';
 import { PDF_LIMITS } from '../../utils/constants';
 import axiosInstance from '../../api/axiosInstance';
 import { PDFS } from '../../api/endpoints';
 
-export default function PdfUploader({ onClose }) {
+export default function PdfUploader({ onClose, compact = false }) {
   const dispatch = useDispatch();
   const { pdfs, isUploading, uploadProgress, error } = useSelector((state) => state.pdf);
+  const { activeChatId } = useSelector((state) => state.chat);
+
+  const handleDeletePdf = async (pdfId) => {
+    try {
+      await axiosInstance.delete(PDFS.DELETE(pdfId));
+      dispatch(removePdf(pdfId));
+    } catch (err) {
+      dispatch(setPdfError(err.response?.data?.detail || 'Failed to delete PDF'));
+    }
+  };
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
@@ -47,13 +57,18 @@ export default function PdfUploader({ onClose }) {
           return;
         }
 
+        // Attach to chat if we're in one
+        if (activeChatId) {
+          await axiosInstance.post(PDFS.ATTACH(activeChatId), { pdf_id: data.id });
+        }
+
         dispatch(addPdf(data));
         dispatch(setUploading(false));
       } catch (err) {
         dispatch(setPdfError(err.response?.data?.detail || 'Upload failed'));
       }
     },
-    [dispatch, pdfs]
+    [dispatch, pdfs, activeChatId]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -64,36 +79,40 @@ export default function PdfUploader({ onClose }) {
   });
 
   return (
-    <div className="max-w-3xl mx-auto glass rounded-xl border border-glass-border p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <FileText size={16} className="text-primary-400" />
-          Upload PDF
-        </h3>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-lg hover:bg-surface-600 text-text-muted hover:text-text-primary transition-colors"
-        >
-          <X size={16} />
-        </button>
-      </div>
+    <div className={`space-y-3 ${compact ? '' : 'max-w-3xl mx-auto glass rounded-xl border border-glass-border p-4'}`}>
+      {!compact && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <FileText size={16} className="text-primary-400" />
+            Upload PDF
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-surface-600 text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Dropzone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-200 ${
+          compact ? 'p-4' : 'p-6'
+        } ${
           isDragActive
             ? 'border-primary-500 bg-primary-500/10'
             : 'border-glass-border hover:border-primary-500/40 hover:bg-surface-700/50'
         } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
       >
         <input {...getInputProps()} />
-        <Upload size={24} className="mx-auto text-text-muted mb-2" />
+        <Upload size={compact ? 20 : 24} className="mx-auto text-text-muted mb-2" />
         {isDragActive ? (
           <p className="text-sm text-primary-400">Drop your PDF here</p>
         ) : (
           <>
-            <p className="text-sm text-text-secondary">
+            <p className={`text-text-secondary ${compact ? 'text-xs' : 'text-sm'}`}>
               Drag & drop a PDF, or <span className="text-primary-400">browse</span>
             </p>
             <p className="text-xs text-text-muted mt-1">Max {PDF_LIMITS.MAX_FILE_SIZE_MB}MB per file</p>
@@ -137,9 +156,16 @@ export default function PdfUploader({ onClose }) {
               <span className="text-xs text-text-primary truncate flex-1">
                 {pdf.filename}
               </span>
-              <span className="text-xs text-text-muted flex-shrink-0">
+              <span className="text-xs text-text-muted flex-shrink-0 mr-2">
                 {pdf.page_count}p · {formatFileSize(pdf.file_size_bytes)}
               </span>
+              <button
+                onClick={() => handleDeletePdf(pdf.id)}
+                className="p-1.5 rounded-md hover:bg-danger/20 text-text-muted hover:text-danger transition-colors flex-shrink-0"
+                title="Remove PDF"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
         </div>

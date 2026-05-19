@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.pdf_document import PdfDocument
 from app.config import get_settings
+import io
+import pypdf
 
 settings = get_settings()
 
@@ -33,11 +35,18 @@ async def save_uploaded_pdf(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # Get page count (basic — count PDF pages from binary)
-    page_count = _count_pdf_pages(content)
-
-    # Extract text (placeholder — will use a proper PDF library later)
-    extracted_text = ""  # TODO: Implement PDF text extraction
+    # Extract text and count pages using pypdf
+    page_count = 1
+    extracted_text = ""
+    try:
+        pdf_reader = pypdf.PdfReader(io.BytesIO(content))
+        page_count = len(pdf_reader.pages)
+        text_parts = []
+        for page in pdf_reader.pages:
+            text_parts.append(page.extract_text() or "")
+        extracted_text = "\n".join(text_parts).strip()
+    except Exception as e:
+        extracted_text = f"[Error extracting PDF text: {str(e)}]"
 
     # Create DB record
     pdf_doc = PdfDocument(
@@ -90,14 +99,3 @@ async def delete_pdf(db: AsyncSession, pdf_id: uuid.UUID, user_id: uuid.UUID) ->
     await db.delete(pdf)
     return True
 
-
-def _count_pdf_pages(content: bytes) -> int:
-    """Count pages in a PDF from its binary content (basic approach)."""
-    try:
-        # Count occurrences of "/Type /Page" (excluding "/Type /Pages")
-        # This is a rough estimate; a proper library will be used later
-        count = content.count(b"/Type /Page")
-        pages_count = content.count(b"/Type /Pages")
-        return max(count - pages_count, 1)
-    except Exception:
-        return 1
