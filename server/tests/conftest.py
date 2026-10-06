@@ -35,8 +35,16 @@ TEST_DB_NAME = f"{_DEV_DB_NAME}_test"
 TEST_DB_URL = f"{_BASE_URL}/{TEST_DB_NAME}"
 
 os.environ["DATABASE_URL"] = TEST_DB_URL
+
+# Uploaded test files go to a throwaway folder, never the real uploads/ directory
+import tempfile  # noqa: E402
+
+TEST_UPLOAD_DIR = tempfile.mkdtemp(prefix="pdfchat_test_uploads_")
+os.environ["UPLOAD_DIR"] = TEST_UPLOAD_DIR
+
 get_settings.cache_clear()
 assert get_settings().DATABASE_URL == TEST_DB_URL
+assert get_settings().UPLOAD_DIR == TEST_UPLOAD_DIR
 
 settings = get_settings()
 
@@ -72,6 +80,9 @@ async def test_database():
 
     yield
 
+    import shutil
+
+    shutil.rmtree(TEST_UPLOAD_DIR, ignore_errors=True)
     await app_engine.dispose()
     conn = await asyncpg.connect(_admin_url())
     await conn.execute(f'DROP DATABASE IF EXISTS "{TEST_DB_NAME}" WITH (FORCE)')

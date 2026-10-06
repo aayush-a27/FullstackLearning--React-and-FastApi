@@ -31,6 +31,8 @@ def _run_migrations():
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     config = Config(str(alembic_ini))
     config.set_main_option("script_location", str(alembic_ini.parent / "alembic"))
+    # Keep the app's own logging — see the matching check in alembic/env.py
+    config.attributes["configure_logger"] = False
     command.upgrade(config, "head")
 
 
@@ -98,6 +100,10 @@ app.add_middleware(SecurityHeadersMiddleware, production=not settings.DEBUG)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
+    # In development, accept any localhost port: Vite moves to 5174, 5175...
+    # whenever 5173 is taken, and that silently broke login. Production
+    # (DEBUG=False) keeps only the explicit ALLOWED_ORIGINS list.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+" if settings.DEBUG else None,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
