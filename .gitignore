@@ -1,0 +1,12 @@
+# Secrets
+.env
+server/.env
+
+# Python
+server/venv/
+server/venv_broken_py314/
+__pycache__/
+*.pyc
+
+# User uploads
+server/uploads/

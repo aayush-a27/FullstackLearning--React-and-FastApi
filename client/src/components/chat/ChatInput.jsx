@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Send, Paperclip, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Loader2, Zap } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import PdfUploader from './PdfUploader';
+import { PdfStatusBanner } from './PdfProcessingStatus';
+import { isPdfIndexing } from '../../hooks/usePdfStatus';
 
 export default function ChatInput() {
   const [message, setMessage] = useState('');
   const [showUploader, setShowUploader] = useState(false);
-  const { activeChatId, isStreaming, sendMessage } = useChat();
-  const { selectedModel } = useSelector((state) => state.model);
+  const { activeChatId, isStreaming, sendMessage, messages } = useChat();
+  const { selectedModel, smartSwitchEnabled } = useSelector((state) => state.model);
+  // Typing is allowed while a PDF is indexed; sending waits until it's searchable
+  const preparing = useSelector((state) => state.pdf.pdfs.some(isPdfIndexing));
+  const canSend = message.trim() && !isStreaming && !preparing;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!message.trim() || isStreaming) return;
-    sendMessage(activeChatId, message.trim(), selectedModel?.id);
+    if (!canSend) return;
+    sendMessage(activeChatId, message.trim(), selectedModel?.id, smartSwitchEnabled);
     setMessage('');
   };
 
@@ -32,6 +37,9 @@ export default function ChatInput() {
           <PdfUploader onClose={() => setShowUploader(false)} />
         </div>
       )}
+
+      {/* PDF indexing / summary progress (the empty-chat card covers indexing itself) */}
+      <PdfStatusBanner hideIndexing={messages.length === 0} />
 
       {/* Input bar */}
       <form
@@ -56,7 +64,11 @@ export default function ChatInput() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything about your PDF..."
+          placeholder={
+            preparing
+              ? "Preparing your PDF — type your question, you can send it once it's ready…"
+              : 'Ask anything about your PDF...'
+          }
           disabled={isStreaming}
           rows={1}
           className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none py-2 max-h-28 disabled:opacity-50"
@@ -67,8 +79,10 @@ export default function ChatInput() {
         <button
           type="submit"
           id="send-message-btn"
+          disabled={!canSend}
+          title={preparing ? 'Your PDF is still being prepared' : undefined}
           className={`p-2 rounded-xl transition-all duration-200 flex-shrink-0 ${
-            message.trim() && !isStreaming
+            canSend
               ? 'bg-primary-600 hover:bg-primary-500 text-white shadow-md shadow-primary-500/20 active:scale-95'
               : 'bg-glass-border/50 text-text-muted/50 cursor-not-allowed'
           }`}
@@ -84,8 +98,17 @@ export default function ChatInput() {
 
       {/* Model indicator */}
       <div className="flex items-center justify-center gap-1.5 mt-1.5">
-        <span className="text-sm">{selectedModel?.icon}</span>
-        <span className="text-[10px] text-text-muted">{selectedModel?.name}</span>
+        {smartSwitchEnabled ? (
+          <>
+            <Zap size={11} className="text-warning" />
+            <span className="text-[10px] text-text-muted">Smart Switch — best model picked per question</span>
+          </>
+        ) : (
+          <>
+            <span className="text-sm">{selectedModel?.icon}</span>
+            <span className="text-[10px] text-text-muted">{selectedModel?.name}</span>
+          </>
+        )}
       </div>
     </div>
   );

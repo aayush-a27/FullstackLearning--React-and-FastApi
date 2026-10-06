@@ -19,12 +19,14 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(255))
-    avatar_url: Mapped[str | None] = mapped_column(String(500))
 
     # Onboarding fields
     language: Mapped[str | None] = mapped_column(String(50))
     purpose: Mapped[str | None] = mapped_column(String(100))
     date_of_birth: Mapped[datetime | None] = mapped_column(Date)
+
+    # Preferences
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

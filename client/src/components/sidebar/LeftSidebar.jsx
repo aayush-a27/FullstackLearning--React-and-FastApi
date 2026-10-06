@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, MessageSquare } from 'lucide-react';
+import { ROUTES } from '../../utils/constants';
 import { useChat } from '../../hooks/useChat';
 import ChatHistoryItem from './ChatHistoryItem';
 import Button from '../common/Button';
@@ -11,16 +13,20 @@ export default function ChatHistoryPanel() {
     activeChatId,
     isLoadingChats,
     fetchChats,
-    createChat,
+    renameChat,
     deleteChat,
     selectChat,
   } = useChat();
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchChats();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewChat = () => {
+    // /dashboard is "new chat"; clear directly too in case we're already there
+    navigate(ROUTES.DASHBOARD);
     selectChat(null);
   };
 
@@ -58,7 +64,7 @@ export default function ChatHistoryPanel() {
               key={chat.id}
               chat={chat}
               isActive={chat.id === activeChatId}
-              onSelect={() => selectChat(chat.id)}
+              onRename={(title) => renameChat(chat.id, title)}
               onDelete={() => deleteChat(chat.id)}
             />
           ))

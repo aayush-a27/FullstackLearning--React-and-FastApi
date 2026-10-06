@@ -1,6 +1,15 @@
+import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setSelectedModel, toggleSmartSwitch } from '../../features/model/modelSlice';
+import { setSelectedModel, toggleSmartSwitch, setModelHealth } from '../../features/model/modelSlice';
 import { Zap } from 'lucide-react';
+import axiosInstance from '../../api/axiosInstance';
+import { MODELS } from '../../api/endpoints';
+
+const HEALTH_LABELS = {
+  healthy: 'Available',
+  degraded: 'Busy — recent requests failed, other models will be used as backup',
+  down: 'Unavailable',
+};
 
 export default function ModelSelector({ compact = false, onSelect }) {
   const dispatch = useDispatch();
@@ -8,11 +17,20 @@ export default function ModelSelector({ compact = false, onSelect }) {
     (state) => state.model
   );
 
+  // Refresh provider health whenever the selector is shown (server caches the checks)
+  useEffect(() => {
+    axiosInstance
+      .get(MODELS.HEALTH)
+      .then(({ data }) => dispatch(setModelHealth(data)))
+      .catch(() => {}); // keep the last known status
+  }, [dispatch]);
+
   const getHealthColor = (provider) => {
     const status = modelHealth[provider];
     if (status === 'down') return 'bg-danger';
     if (status === 'degraded') return 'bg-warning';
-    return 'bg-primary-500';
+    if (status === 'healthy') return 'bg-primary-500';
+    return 'bg-text-muted/50'; // not checked yet
   };
 
   const handleSelect = (modelId) => {
@@ -43,7 +61,10 @@ export default function ModelSelector({ compact = false, onSelect }) {
                 <p className="text-xs text-text-muted truncate">{model.description}</p>
               )}
             </div>
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getHealthColor(model.provider)}`} />
+            <div
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${getHealthColor(model.provider)}`}
+              title={HEALTH_LABELS[modelHealth[model.provider]] || 'Checking…'}
+            />
           </button>
         ))}
       </div>

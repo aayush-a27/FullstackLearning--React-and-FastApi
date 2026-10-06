@@ -12,50 +12,49 @@ import pypdf
 settings = get_settings()
 
 
+class InvalidPdfError(Exception):
+    """Raised when an uploaded file can't be opened as a PDF."""
+
+
 async def save_uploaded_pdf(
     db: AsyncSession,
     file: UploadFile,
     user_id: uuid.UUID,
 ) -> PdfDocument:
-    """Save an uploaded PDF file to disk and create a DB record."""
-    # Create upload directory if it doesn't exist
+    """
+    Save an uploaded PDF to disk and create its DB record.
+
+    Only the page count is read here — text extraction, chunking and embedding
+    happen in the background (app/services/pdf_processing.py) so large uploads
+    return immediately instead of timing out the browser.
+    """
     upload_dir = Path(settings.UPLOAD_DIR) / str(user_id)
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate unique filename
     file_ext = Path(file.filename).suffix
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = upload_dir / unique_filename
 
-    # Read file content
     content = await file.read()
     file_size = len(content)
 
-    # Save to disk
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # Extract text and count pages using pypdf
-    page_count = 1
-    extracted_text = ""
+    # Cheap: reads the page tree, not the page contents
     try:
-        pdf_reader = pypdf.PdfReader(io.BytesIO(content))
-        page_count = len(pdf_reader.pages)
-        text_parts = []
-        for page in pdf_reader.pages:
-            text_parts.append(page.extract_text() or "")
-        extracted_text = "\n".join(text_parts).strip()
+        page_count = len(pypdf.PdfReader(io.BytesIO(content)).pages)
     except Exception as e:
-        extracted_text = f"[Error extracting PDF text: {str(e)}]"
+        os.remove(file_path)
+        raise InvalidPdfError("This file isn't a readable PDF.") from e
 
-    # Create DB record
     pdf_doc = PdfDocument(
         user_id=user_id,
         filename=file.filename,
         storage_path=str(file_path),
         file_size_bytes=file_size,
         page_count=page_count,
-        extracted_text=extracted_text,
+        status="pending",
     )
     db.add(pdf_doc)
     await db.flush()

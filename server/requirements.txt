@@ -24,3 +24,16 @@ python-multipart
 
 # Database Migrations
 alembic
+
+# AI / LLM (Groq + Gemini via litellm)
+litellm
+
+# PDF text extraction
+pypdf
+
+# Vector math for embeddings / similarity search
+numpy
+
+# Testing
+pytest
+pytest-asyncio

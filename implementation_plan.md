@@ -277,7 +277,6 @@ erDiagram
         string username UK
         string hashed_password
         string full_name
-        string avatar_url
         boolean is_active
         boolean is_onboarded
         timestamp created_at

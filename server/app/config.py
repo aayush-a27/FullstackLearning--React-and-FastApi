@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Cookies — Secure requires HTTPS, so it's off for local http://localhost
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"
+
     # JWT
     JWT_SECRET_KEY: str = "super-secret-jwt-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -35,6 +39,8 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    NEMOTRON_API_KEY: str = ""
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
     model_config = {

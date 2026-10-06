@@ -86,6 +86,21 @@ export function useAuth() {
     }
   };
 
+  /** Save a profile/preference change and update the store. */
+  const saveProfile = async (changes) => {
+    const { data } = await axiosInstance.patch(USERS.UPDATE_PROFILE, changes);
+    dispatch(updateUser(data));
+    return data;
+  };
+
+  /** Permanently delete the account, then return to the login page. */
+  const deleteAccount = async (password) => {
+    await axiosInstance.delete(USERS.DELETE_ACCOUNT, { data: { password } });
+    localStorage.removeItem('accessToken');
+    dispatch(logoutAction());
+    navigate(ROUTES.LOGIN);
+  };
+
   const fetchUser = async () => {
     try {
       const token = localStorage.getItem('accessToken');
@@ -117,6 +132,8 @@ export function useAuth() {
     register,
     logout,
     submitOnboarding,
+    saveProfile,
+    deleteAccount,
     fetchUser,
   };
 }

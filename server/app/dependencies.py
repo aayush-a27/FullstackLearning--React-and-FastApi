@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.core.security import decode_token
@@ -45,8 +46,8 @@ async def get_current_user(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token has been revoked",
                 )
-        except RuntimeError:
-            # Redis not available — skip blacklist check in dev
+        except (RuntimeError, RedisError):
+            # Redis not initialized or went down — skip blacklist check
             pass
 
     # Fetch user from DB

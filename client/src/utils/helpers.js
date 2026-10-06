@@ -10,7 +10,7 @@ import { PDF_LIMITS } from './constants';
 export function getMaxPdfsAllowed(existingPdfs = []) {
   if (existingPdfs.length === 0) return PDF_LIMITS.SMALL_PDF_MAX_FILES;
 
-  const maxPages = Math.max(...existingPdfs.map((p) => p.pageCount || 0));
+  const maxPages = Math.max(...existingPdfs.map((p) => p.page_count || 0));
 
   if (maxPages > PDF_LIMITS.MEDIUM_PDF_MAX_PAGES) return PDF_LIMITS.LARGE_PDF_MAX_FILES;
   if (maxPages > PDF_LIMITS.SMALL_PDF_MAX_PAGES) return PDF_LIMITS.MEDIUM_PDF_MAX_FILES;
@@ -21,7 +21,7 @@ export function getMaxPdfsAllowed(existingPdfs = []) {
  * Check if a new PDF can be added to the existing set.
  */
 export function canAddPdf(existingPdfs, newPdfPageCount) {
-  const allPdfs = [...existingPdfs, { pageCount: newPdfPageCount }];
+  const allPdfs = [...existingPdfs, { page_count: newPdfPageCount }];
   const maxAllowed = getMaxPdfsAllowed(allPdfs);
   return allPdfs.length <= maxAllowed;
 }
@@ -74,4 +74,24 @@ export function getInitials(name) {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+}
+
+/**
+ * Turn an axios error into a short, user-friendly message.
+ * Backend `detail` strings for 4xx/503 are written for end users; anything
+ * else (500s, validation arrays, network failures) gets a generic message.
+ */
+export function getFriendlyError(err, fallback = 'Something went wrong. Please try again.') {
+  if (err?.code === 'ECONNABORTED') {
+    return 'This is taking longer than expected. Please try again.';
+  }
+  if (!err?.response) {
+    return "Can't reach the server. Check your connection and try again.";
+  }
+  const { status, data } = err.response;
+  const detail = typeof data?.detail === 'string' ? data.detail : null;
+  if (detail && (status < 500 || status === 503)) {
+    return detail;
+  }
+  return fallback;
 }

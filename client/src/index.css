@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ===== CUSTOM THEME — Dark Green + Black ===== */
 @theme {
@@ -316,3 +317,67 @@ input:-webkit-autofill:focus {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* ===== AI RESPONSE MARKDOWN ===== */
+.chat-markdown {
+  --tw-prose-invert-body: var(--color-text-primary);
+  --tw-prose-invert-headings: var(--color-primary-300);
+  --tw-prose-invert-bold: #ffffff;
+  --tw-prose-invert-links: var(--color-primary-400);
+  --tw-prose-invert-bullets: var(--color-primary-500);
+  --tw-prose-invert-counters: var(--color-primary-400);
+  --tw-prose-invert-hr: var(--color-glass-border);
+  --tw-prose-invert-quotes: var(--color-text-secondary);
+  --tw-prose-invert-quote-borders: var(--color-primary-600);
+  --tw-prose-invert-code: var(--color-primary-200);
+  --tw-prose-invert-th-borders: var(--color-glass-border);
+  --tw-prose-invert-td-borders: var(--color-glass-border);
+  line-height: 1.7;
+}
+
+.chat-markdown > :first-child { margin-top: 0; }
+.chat-markdown > :last-child { margin-bottom: 0; }
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3 {
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.35;
+}
+.chat-markdown h1 { font-size: 1.2em; }
+.chat-markdown h2 { font-size: 1.1em; }
+.chat-markdown h3 { font-size: 1em; }
+
+.chat-markdown p { margin: 0.6em 0; }
+.chat-markdown ul,
+.chat-markdown ol { margin: 0.5em 0; padding-left: 1.4em; }
+.chat-markdown li { margin: 0.25em 0; }
+.chat-markdown li > p { margin: 0.2em 0; }
+.chat-markdown hr { margin: 1.25em 0; }
+
+.chat-markdown code:not(pre code) {
+  background: var(--color-surface-600);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-weight: 400;
+}
+.chat-markdown code:not(pre code)::before,
+.chat-markdown code:not(pre code)::after { content: none; }
+.chat-markdown pre {
+  background: var(--color-surface-900);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 8px;
+}
+
+/* Tables scroll sideways instead of squashing the bubble */
+.chat-markdown .table-wrap {
+  overflow-x: auto;
+  margin: 0.75em 0;
+  border: 1px solid var(--color-glass-border);
+  border-radius: 8px;
+}
+.chat-markdown table { margin: 0; width: 100%; font-size: 0.95em; }
+.chat-markdown thead { background: rgba(16, 185, 129, 0.08); }
+.chat-markdown th,
+.chat-markdown td { padding: 0.5em 0.75em !important; vertical-align: top; }

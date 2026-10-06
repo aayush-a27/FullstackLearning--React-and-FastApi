@@ -25,6 +25,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.ONBOARDING} element={<Onboarding />} />
         <Route element={<AppLayout />}>
           <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+          <Route path={ROUTES.CHAT} element={<Dashboard />} />
           <Route path={ROUTES.PROFILE} element={<Profile />} />
           <Route path={ROUTES.SETTINGS} element={<Settings />} />
         </Route>

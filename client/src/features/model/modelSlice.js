@@ -2,11 +2,11 @@ import { createSlice } from '@reduxjs/toolkit';
 import { AI_MODELS } from '../../utils/constants';
 
 const initialState = {
-  selectedModel: AI_MODELS[0],          // Default to first model (GPT-4o)
+  selectedModel: AI_MODELS[0],          // Default to first model (Nemotron Super)
   smartSwitchEnabled: true,             // Smart switch on by default
   availableModels: AI_MODELS,
-  modelHealth: {},                       // { 'openai': 'healthy', 'google': 'degraded', ... }
-  fallbackChain: ['gemini-pro', 'gemini-flash', 'groq-llama3'],
+  modelHealth: {},                       // { 'groq': 'healthy', 'google': 'degraded', ... }
+  fallbackChain: ['nemotron-super', 'gemini-flash', 'groq-fast'],
 };
 
 const modelSlice = createSlice({
@@ -25,6 +25,10 @@ const modelSlice = createSlice({
     setSmartSwitch(state, action) {
       state.smartSwitchEnabled = action.payload;
     },
+    setModelHealth(state, action) {
+      // action.payload = { groq: 'healthy', google: 'degraded', nvidia: 'down' }
+      state.modelHealth = action.payload;
+    },
     updateModelHealth(state, action) {
       // action.payload = { provider: 'openai', status: 'healthy' | 'degraded' | 'down' }
       state.modelHealth[action.payload.provider] = action.payload.status;
@@ -39,6 +43,7 @@ export const {
   setSelectedModel,
   toggleSmartSwitch,
   setSmartSwitch,
+  setModelHealth,
   updateModelHealth,
   setFallbackChain,
 } = modelSlice.actions;

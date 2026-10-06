@@ -11,6 +11,7 @@ export const USERS = {
   ME: '/users/me',
   ONBOARDING: '/users/me/onboarding',
   UPDATE_PROFILE: '/users/me',
+  DELETE_ACCOUNT: '/users/me',
 };
 
 export const CHATS = {
@@ -19,6 +20,7 @@ export const CHATS = {
   GET: (id) => `/chats/${id}`,
   DELETE: (id) => `/chats/${id}`,
   UPDATE: (id) => `/chats/${id}`,
+  RENAME: (id) => `/chats/${id}`,
 };
 
 export const MESSAGES = {

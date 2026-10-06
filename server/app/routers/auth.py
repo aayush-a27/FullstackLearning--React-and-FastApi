@@ -1,4 +1,8 @@
+import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi.security import HTTPAuthorizationCredentials
+from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.auth import LoginRequest, RegisterRequest, AuthResponse
@@ -12,14 +16,35 @@ from app.services.auth_service import (
     generate_tokens,
 )
 from app.core.security import decode_token
-from app.core.redis import blacklist_token
-from app.dependencies import get_current_user
+from app.core.redis import blacklist_token, is_token_blacklisted
+from app.core.rate_limit import rate_limited_by_ip, REGISTER_LIMIT
+from app.dependencies import get_current_user, security
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def _set_refresh_cookie(response: Response, refresh_token: str):
+    """Store the refresh token in an httpOnly cookie (never readable by JS)."""
+    settings = get_settings()
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,  # True once served over HTTPS
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
+
+
+
+@router.post(
+    "/register",
+    response_model=AuthResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limited_by_ip(REGISTER_LIMIT))],
+)
 async def register(
     request: RegisterRequest,
     response: Response,
@@ -55,14 +80,7 @@ async def register(
     tokens = generate_tokens(user)
 
     # Set HTTP-only refresh token cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=tokens["refresh_token"],
-        httponly=True,
-        secure=False,  # Set True in production (HTTPS)
-        samesite="lax",
-        max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
+    _set_refresh_cookie(response, tokens["refresh_token"])
 
     return AuthResponse(
         access_token=tokens["access_token"],
@@ -87,14 +105,7 @@ async def login(
     tokens = generate_tokens(user)
 
     # Set HTTP-only refresh token cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=tokens["refresh_token"],
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
+    _set_refresh_cookie(response, tokens["refresh_token"])
 
     return AuthResponse(
         access_token=tokens["access_token"],
@@ -102,13 +113,31 @@ async def login(
     )
 
 
+async def _blacklist_until_expiry(payload: dict | None):
+    """Blacklist a decoded token's jti for the rest of its lifetime."""
+    if not payload or not payload.get("jti") or not payload.get("exp"):
+        return
+    ttl = int(payload["exp"] - datetime.now(timezone.utc).timestamp())
+    if ttl > 0:
+        await blacklist_token(payload["jti"], ttl)
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: User = Depends(get_current_user),
 ):
-    """Logout the current user by blacklisting their token and clearing cookies."""
-    # Note: Token blacklisting requires Redis to be running
-    # In dev without Redis, logout just returns success
+    """Logout the current user by blacklisting their tokens and clearing cookies."""
+    try:
+        await _blacklist_until_expiry(decode_token(credentials.credentials))
+        refresh_cookie = request.cookies.get("refresh_token")
+        if refresh_cookie:
+            await _blacklist_until_expiry(decode_token(refresh_cookie))
+    except (RuntimeError, RedisError):
+        # Redis not available — tokens stay valid until they expire
+        logger.warning("Logout without Redis: tokens were not blacklisted")
+
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     response.delete_cookie(key="refresh_token")
     return response
@@ -135,6 +164,15 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
         )
+
+    try:
+        if payload.get("jti") and await is_token_blacklisted(payload["jti"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been revoked",
+            )
+    except (RuntimeError, RedisError):
+        pass
 
     user_id_str = payload.get("sub")
     if not user_id_str:

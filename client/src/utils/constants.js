@@ -4,24 +4,24 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 // AI Models available for selection
 export const AI_MODELS = [
   {
-    id: 'gemini-pro',
-    name: 'Gemini 2.5 Pro',
-    provider: 'google',
-    description: 'Best reasoning and long context',
+    id: 'nemotron-super',
+    name: 'Nemotron Super 120B',
+    provider: 'nvidia',
+    description: 'Best reasoning for complex questions',
     icon: '💎',
     tier: 'premium',
   },
   {
     id: 'gemini-flash',
-    name: 'Gemini 2.5 Flash',
+    name: 'Gemini Flash',
     provider: 'google',
-    description: 'Fast and versatile',
+    description: 'Fast, versatile, long context',
     icon: '⚡',
     tier: 'standard',
   },
   {
-    id: 'groq-llama3',
-    name: 'Groq Llama-3',
+    id: 'groq-fast',
+    name: 'Groq GPT-OSS 20B',
     provider: 'groq',
     description: 'Lightning fast responses',
     icon: '🚀',
@@ -70,6 +70,13 @@ export const ROUTES = {
   SIGNUP: '/signup',
   ONBOARDING: '/onboarding',
   DASHBOARD: '/dashboard',
+  CHAT: '/chat/:chatId',
   PROFILE: '/profile',
   SETTINGS: '/settings',
 };
+
+/** Shareable URL for one chat. */
+export const chatPath = (chatId) => `/chat/${chatId}`;
+
+/** Routes shown as a modal on top of the chat layout. */
+export const MODAL_ROUTES = [ROUTES.PROFILE, ROUTES.SETTINGS];

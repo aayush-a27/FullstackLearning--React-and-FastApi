@@ -17,6 +17,13 @@ const pdfSlice = createSlice({
     addPdf(state, action) {
       state.pdfs.push(action.payload);
     },
+    updatePdf(state, action) {
+      // Merge in fresh processing status from the server
+      const index = state.pdfs.findIndex((p) => p.id === action.payload.id);
+      if (index !== -1) {
+        state.pdfs[index] = { ...state.pdfs[index], ...action.payload };
+      }
+    },
     removePdf(state, action) {
       state.pdfs = state.pdfs.filter((p) => p.id !== action.payload);
     },
@@ -25,7 +32,9 @@ const pdfSlice = createSlice({
     },
     setUploading(state, action) {
       state.isUploading = action.payload;
-      if (!action.payload) {
+      if (action.payload) {
+        state.error = null; // clear any previous error when a new upload starts
+      } else {
         state.uploadProgress = 0;
       }
     },
@@ -46,6 +55,7 @@ const pdfSlice = createSlice({
 export const {
   setPdfs,
   addPdf,
+  updatePdf,
   removePdf,
   setUploadProgress,
   setUploading,

@@ -8,13 +8,20 @@ redis_client: redis.Redis | None = None
 
 
 async def init_redis() -> redis.Redis:
-    """Initialize and return the async Redis client."""
+    """Initialize and return the async Redis client. Raises if Redis is unreachable."""
     global redis_client
-    redis_client = redis.from_url(
+    client = redis.from_url(
         settings.REDIS_URL,
         encoding="utf-8",
         decode_responses=True,
     )
+    try:
+        # from_url() is lazy — ping so a dead Redis fails here, not on every request
+        await client.ping()
+    except Exception:
+        await client.aclose()
+        raise
+    redis_client = client
     return redis_client
 
 
@@ -22,7 +29,7 @@ async def close_redis():
     """Close the Redis connection."""
     global redis_client
     if redis_client:
-        await redis_client.close()
+        await redis_client.aclose()
         redis_client = None
 
 

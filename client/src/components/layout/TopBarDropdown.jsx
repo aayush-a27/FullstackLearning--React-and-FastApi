@@ -63,11 +63,7 @@ export default function TopBarDropdown() {
         }}
         className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-primary-500/10 transition-all duration-200"
       >
-        <Avatar
-          name={user?.full_name || user?.username}
-          src={user?.avatar_url}
-          size="sm"
-        />
+        <Avatar name={user?.full_name || user?.username} size="sm" />
         <div className="hidden sm:flex flex-col items-start min-w-0">
           <span className="text-xs font-medium text-text-primary truncate max-w-[100px]">
             {user?.full_name || user?.username || 'User'}
@@ -93,11 +89,7 @@ export default function TopBarDropdown() {
           {/* User info */}
           <div className="px-4 py-3 border-b border-glass-border">
             <div className="flex items-center gap-3">
-              <Avatar
-                name={user?.full_name || user?.username}
-                src={user?.avatar_url}
-                size="md"
-              />
+              <Avatar name={user?.full_name || user?.username} size="md" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-text-primary truncate">
                   {user?.full_name || user?.username || 'User'}

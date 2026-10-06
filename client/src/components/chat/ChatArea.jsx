@@ -3,11 +3,14 @@ import { useSelector } from 'react-redux';
 import { FileText, Sparkles } from 'lucide-react';
 import ChatBubble from './ChatBubble';
 import Loader from '../common/Loader';
+import { PdfPreparingCard } from './PdfProcessingStatus';
+import { isPdfIndexing } from '../../hooks/usePdfStatus';
 
 export default function ChatArea() {
   const { messages, isStreaming, isLoadingMessages, activeChatId } = useSelector(
     (state) => state.chat
   );
+  const preparing = useSelector((state) => state.pdf.pdfs.some(isPdfIndexing));
   const bottomRef = useRef(null);
 
   // Auto-scroll to bottom on new messages
@@ -17,7 +20,10 @@ export default function ChatArea() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">
-      {!activeChatId ? (
+      {preparing && messages.length === 0 && !isLoadingMessages ? (
+        /* PDF still being indexed — explain the wait instead of a blank chat */
+        <PdfPreparingCard />
+      ) : !activeChatId ? (
         /* Empty state — no chat selected */
         <div className="h-full flex flex-col items-center justify-center animate-fade-in">
           <div className="w-16 h-16 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mb-4 animate-pulse-glow">

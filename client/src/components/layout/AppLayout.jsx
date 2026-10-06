@@ -1,7 +1,10 @@
-import { useCallback, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
+import { X } from 'lucide-react';
 import { setPanelWidths } from '../../features/ui/uiSlice';
+import { ROUTES, MODAL_ROUTES, chatPath } from '../../utils/constants';
+import { usePdfStatus } from '../../hooks/usePdfStatus';
 import Navbar from './Navbar';
 import PanelWrapper from './PanelWrapper';
 import ResizeHandle from './ResizeHandle';
@@ -35,7 +38,9 @@ export default function AppLayout() {
   const dispatch = useDispatch();
   const { panelOrder, panelWidths } = useSelector((state) => state.ui);
   const containerRef = useRef(null);
-  const resizeStartRef = useRef(null);
+
+  // Keep PDF indexing status fresh while documents are being processed
+  usePdfStatus();
 
   // Handle resize of panels
   const handleResize = useCallback(
@@ -127,11 +132,53 @@ export default function AppLayout() {
   );
 }
 
-// Render Profile/Settings as an overlay on top of the panel layout
+// Profile/Settings open as a modal on top of the panel layout.
+// On /dashboard and /chat/:id the Outlet is Dashboard, which renders nothing
+// visible (it only syncs the open chat with the URL), so it's rendered as-is.
 function OutletOverlay() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const activeChatId = useSelector((state) => state.chat.activeChatId);
+  const isModal = MODAL_ROUTES.includes(pathname);
+
+  // Closing returns to the chat that was open underneath
+  const close = useCallback(() => {
+    navigate(activeChatId ? chatPath(activeChatId) : ROUTES.DASHBOARD);
+  }, [navigate, activeChatId]);
+
+  useEffect(() => {
+    if (!isModal) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isModal, close]);
+
+  if (!isModal) return <Outlet />;
+
   return (
-    <div className="hidden">
-      <Outlet />
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={close}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-surface-800 border border-glass-border shadow-2xl shadow-black/60 animate-slide-up"
+        // Clicks inside the panel shouldn't close it
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Close"
+          className="absolute top-4 right-4 z-10 p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-600 transition-colors"
+        >
+          <X size={18} />
+        </button>
+        <Outlet />
+      </div>
     </div>
   );
 }

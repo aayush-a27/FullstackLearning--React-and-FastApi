@@ -1,102 +1,175 @@
 """
-Smart Model Router — Auto-selects AI model based on question complexity
-using Groq, and falls back to alternative models.
+Smart Model Router — picks an AI model from the question itself.
+
+Classification is a local heuristic, not an LLM call: routing used to spend a
+whole extra API round-trip (and its latency and rate-limit budget) just to label
+the question before answering it.
 """
-import json
 import logging
-from litellm import acompletion
+import re
 from app.config import get_settings
-from app.core.redis import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Free models via litellm mapping
+# Free models via litellm mapping (internal key -> litellm model name)
 FREE_MODELS = {
-    "groq-llama3": "groq/llama-3.1-8b-instant",
-    "gemini-flash": "gemini/gemini-2.5-flash",
-    "gemini-pro": "gemini/gemini-2.5-pro",
+    "groq-fast": "groq/openai/gpt-oss-20b",
+    "gemini-flash": "gemini/gemini-flash-latest",
+    "nemotron-super": "openai/nvidia/nemotron-3-super-120b-a12b",  # NVIDIA NIM (OpenAI-compatible)
+}
+
+# Which provider each internal key belongs to (used to pick API key / base URL)
+MODEL_PROVIDERS = {
+    "groq-fast": "groq",
+    "gemini-flash": "google",
+    "nemotron-super": "nvidia",
+}
+
+DEFAULT_MODEL = "groq-fast"
+
+# Rough max context (in characters, ~4 chars/token) each model can take per request.
+# Groq's limit is set by the free-tier tokens-per-minute cap, not the model's context window.
+MODEL_MAX_CONTEXT_CHARS = {
+    "groq-fast": 24_000,           # ~6k tokens (free tier TPM cap)
+    "gemini-flash": 2_000_000,     # ~500k tokens of a 1M window
+    "nemotron-super": 300_000,     # ~75k tokens of a 128k window
 }
 
 # Mapping from complexity to preferred model tier
 COMPLEXITY_TO_MODEL = {
-    "simple": "groq-llama3",     # Groq is fastest and free
-    "moderate": "gemini-flash",  # Fast, free, larger context
-    "complex": "gemini-pro",     # Best reasoning, free tier available
+    "simple": "groq-fast",         # Groq is fastest and free
+    "moderate": "gemini-flash",    # Fast, free, larger context
+    "complex": "nemotron-super",   # Best reasoning of the free models
 }
 
 DEFAULT_FALLBACK_CHAIN = [
-    "gemini-pro",
+    "nemotron-super",
     "gemini-flash",
-    "groq-llama3"
+    "groq-fast",
 ]
 
-async def classify_complexity(question: str, pdf_context: str = "") -> str:
+# Old model IDs that may still be stored on chats or sent by an old client
+LEGACY_MODEL_IDS = {
+    "groq-llama3": "groq-fast",
+    "gemini-pro": "gemini-flash",
+    "gpt-4o": "nemotron-super",
+    "gpt-4o-mini": "groq-fast",
+    "claude-sonnet": "nemotron-super",
+    "llama-local": "groq-fast",
+}
+
+# --- Heuristic classification ----------------------------------------------
+
+# Deep reasoning, multi-step work, or writing at length
+COMPLEX_PATTERNS = re.compile(
+    r"\b(analys|analyz|compar|contrast|evaluat|critiq|assess|implic|"
+    r"why\s+(?:do|does|did|is|are|was|were)|reason(?:ing)?\b|argue|argument|"
+    r"step[-\s]by[-\s]step|in\s+detail|detailed|comprehensive|thorough|"
+    r"pros\s+and\s+cons|trade[-\s]?offs?|strengths?\s+and\s+weakness|"
+    r"write\s+(?:an?\s+)?(?:essay|report|article)|draft|rewrite|"
+    r"code|implement|debug|refactor|algorithm|derive|prove)",
+    re.IGNORECASE,
+)
+
+# Summarizing / synthesizing a chunk of material
+MODERATE_PATTERNS = re.compile(
+    r"\b(summar|overview|outline|key\s+points?|main\s+(?:points?|ideas?|themes?)|"
+    r"explain|describe|how\s+does|how\s+do|what\s+happens|walk\s+me\s+through|"
+    r"list\s+all|timeline)",
+    re.IGNORECASE,
+)
+
+# Short factual lookups and chit-chat
+SIMPLE_PATTERNS = re.compile(
+    r"^\s*(hi|hey|hello|thanks|thank\s+you|ok(?:ay)?|yes|no|sure|cool|"
+    r"who\s+is|who\s+was|what\s+is\s+the\s+name|when\s+(?:is|was|did)|"
+    r"where\s+(?:is|was)|how\s+many|how\s+much|define|spell)\b",
+    re.IGNORECASE,
+)
+
+# Questions about the document as a whole, which retrieval alone can't answer
+SUMMARY_INTENT_PATTERNS = re.compile(
+    r"\b(summar(?:y|ise|ize|izing|ising)|tl;?dr|overview\s+of\s+(?:the\s+)?(?:doc|book|pdf|file|paper|report)|"
+    r"what(?:'s| is)\s+(?:this|the)\s+(?:doc(?:ument)?|book|pdf|file|paper|report)\s+about|"
+    r"what\s+is\s+it\s+about|tell\s+me\s+about\s+(?:this|the)\s+(?:doc(?:ument)?|book|pdf|file|paper|report)|"
+    r"main\s+(?:points?|ideas?|themes?|takeaways?)|key\s+takeaways?|"
+    r"outline\s+(?:of\s+)?(?:this|the)\b|overall\s+(?:theme|structure|argument))",
+    re.IGNORECASE,
+)
+
+# Above this much context, a small model can't do the job well
+LARGE_CONTEXT_CHARS = 20_000
+LONG_QUESTION_WORDS = 40
+
+
+def normalize_model_id(model_id: str | None) -> str | None:
+    """Map legacy/unknown model IDs to a current internal key."""
+    if not model_id:
+        return None
+    model_id = LEGACY_MODEL_IDS.get(model_id, model_id)
+    return model_id if model_id in FREE_MODELS else None
+
+
+def get_provider_credentials(model_id: str) -> tuple[str, str | None]:
+    """Return (api_key, api_base) for an internal model key."""
+    provider = MODEL_PROVIDERS.get(model_id)
+    if provider == "groq":
+        return settings.GROQ_API_KEY, None
+    if provider == "google":
+        return settings.GOOGLE_API_KEY, None
+    if provider == "nvidia":
+        return settings.NEMOTRON_API_KEY, settings.NVIDIA_BASE_URL
+    return "", None
+
+
+def is_summary_question(question: str) -> bool:
+    """True when the user is asking about the document as a whole."""
+    return bool(SUMMARY_INTENT_PATTERNS.search(question or ""))
+
+
+def classify_complexity(question: str, context_len: int = 0) -> str:
     """
-    Classify the complexity of a question using Groq Llama3.
-    Returns: 'simple' | 'moderate' | 'complex'
+    Classify question complexity locally: 'simple' | 'moderate' | 'complex'.
+    No API call — this runs in microseconds.
     """
-    system_prompt = (
-        "You are an efficient routing AI. Classify the user's question complexity.\n"
-        "Return ONLY a JSON object: {\"complexity\": \"simple\"} OR {\"complexity\": \"moderate\"} OR {\"complexity\": \"complex\"}\n"
-        "simple: Basic facts, greetings, short questions.\n"
-        "moderate: Summaries, basic analysis.\n"
-        "complex: Deep reasoning, coding, long document synthesis."
-    )
-    
-    try:
-        if not settings.GROQ_API_KEY:
-            return "moderate" # Fallback if no key
+    question = (question or "").strip()
+    if not question:
+        return "simple"
 
-        response = await acompletion(
-            model=FREE_MODELS["groq-llama3"],
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Question: {question}\nContext Length: {len(pdf_context)}"}
-            ],
-            api_key=settings.GROQ_API_KEY,
-            response_format={"type": "json_object"}
-        )
-        
-        result = response.choices[0].message.content
-        data = json.loads(result)
-        return data.get("complexity", "moderate").lower()
-    except Exception as e:
-        logger.error(f"Router AI failed: {e}")
-        return "moderate" # Fallback
+    word_count = len(question.split())
+
+    if COMPLEX_PATTERNS.search(question) or word_count > LONG_QUESTION_WORDS:
+        return "complex"
+    if context_len >= LARGE_CONTEXT_CHARS:
+        # A lot of material to synthesize, even for a plainly worded question
+        return "complex"
+    if MODERATE_PATTERNS.search(question):
+        return "moderate"
+    if SIMPLE_PATTERNS.search(question) or word_count <= 8:
+        return "simple"
+    return "moderate"
 
 
-async def select_model(
+def select_model(
     question: str,
     user_selected_model: str | None = None,
     smart_switch_enabled: bool = True,
+    context_len: int = 0,
     fallback_chain: list[str] | None = None,
 ) -> str:
     """
     Select the best model ID for a question.
-    Returns the internal model key (e.g. 'groq-llama3')
+    Returns the internal model key (e.g. 'groq-fast').
     """
     chain = fallback_chain or DEFAULT_FALLBACK_CHAIN
-
-    # Map frontend hardcoded IDs to our free models if they pass them directly
-    frontend_map = {
-        "gpt-4o": "gemini-pro",
-        "gpt-4o-mini": "groq-llama3",
-        "gemini-pro": "gemini-pro",
-        "claude-sonnet": "gemini-pro",
-        "llama-local": "groq-llama3",
-    }
-    
-    if user_selected_model in frontend_map:
-        user_selected_model = frontend_map[user_selected_model]
+    user_selected_model = normalize_model_id(user_selected_model)
 
     if not smart_switch_enabled and user_selected_model:
         return user_selected_model
 
     if smart_switch_enabled:
-        complexity = await classify_complexity(question)
-        preferred = COMPLEXITY_TO_MODEL.get(complexity, "gemini-flash")
-        return preferred
+        complexity = classify_complexity(question, context_len)
+        return COMPLEXITY_TO_MODEL.get(complexity, "gemini-flash")
 
-    # Last resort
-    return chain[-1] if chain else "groq-llama3"
+    return chain[-1] if chain else DEFAULT_MODEL

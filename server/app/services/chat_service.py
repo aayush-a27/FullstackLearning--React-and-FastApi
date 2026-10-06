@@ -5,6 +5,40 @@ from sqlalchemy.orm import selectinload
 from app.models.chat import Chat
 from app.models.pdf_document import PdfDocument
 
+# Multi-PDF limits per chat (mirrors PDF_LIMITS in client/src/utils/constants.js)
+SMALL_PDF_MAX_PAGES = 5
+MEDIUM_PDF_MAX_PAGES = 30
+SMALL_PDF_MAX_FILES = 5
+MEDIUM_PDF_MAX_FILES = 2
+LARGE_PDF_MAX_FILES = 1
+
+
+class PdfLimitError(Exception):
+    """Raised when attaching PDFs would exceed the per-chat limit."""
+
+
+def max_pdfs_allowed(page_counts: list[int]) -> int:
+    """
+    All PDFs <= 5 pages -> up to 5; any PDF 6-30 pages -> up to 2;
+    any PDF > 30 pages -> only 1.
+    """
+    largest = max(page_counts, default=0)
+    if largest > MEDIUM_PDF_MAX_PAGES:
+        return LARGE_PDF_MAX_FILES
+    if largest > SMALL_PDF_MAX_PAGES:
+        return MEDIUM_PDF_MAX_FILES
+    return SMALL_PDF_MAX_FILES
+
+
+def check_pdf_limit(pdfs: list[PdfDocument]):
+    """Raise PdfLimitError if this set of PDFs is too many for one chat."""
+    allowed = max_pdfs_allowed([p.page_count for p in pdfs])
+    if len(pdfs) > allowed:
+        raise PdfLimitError(
+            f"This chat can hold at most {allowed} PDF{'s' if allowed > 1 else ''} "
+            "of this size. Start a new chat for more documents."
+        )
+
 
 async def get_user_chats(db: AsyncSession, user_id: UUID) -> list[Chat]:
     """Get all chats for a user, ordered by most recent."""
@@ -45,6 +79,7 @@ async def create_chat(
             )
         )
         pdfs = list(result.scalars().all())
+        check_pdf_limit(pdfs)
         chat.pdf_documents = pdfs
         chat.total_pdf_pages = sum(p.page_count for p in pdfs)
 
@@ -93,6 +128,7 @@ async def attach_pdf_to_chat(db: AsyncSession, chat_id: UUID, user_id: UUID, pdf
 
     # Check if already attached
     if not any(p.id == pdf_id for p in chat.pdf_documents):
+        check_pdf_limit(chat.pdf_documents + [pdf])
         chat.pdf_documents.append(pdf)
         chat.total_pdf_pages = sum(p.page_count for p in chat.pdf_documents)
         await db.flush()

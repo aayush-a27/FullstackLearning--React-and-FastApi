@@ -24,6 +24,10 @@ const chatSlice = createSlice({
     addChat(state, action) {
       state.chats.unshift(action.payload);
     },
+    updateChat(state, action) {
+      const index = state.chats.findIndex((c) => c.id === action.payload.id);
+      if (index !== -1) state.chats[index] = { ...state.chats[index], ...action.payload };
+    },
     removeChat(state, action) {
       state.chats = state.chats.filter((c) => c.id !== action.payload);
       if (state.activeChatId === action.payload) {
@@ -43,6 +47,15 @@ const chatSlice = createSlice({
     },
     addMessage(state, action) {
       state.messages.push(action.payload);
+    },
+    replaceLastMessage(state, action) {
+      if (state.messages.length > 0) {
+        state.messages[state.messages.length - 1] = action.payload;
+      }
+    },
+    patchLastMessage(state, action) {
+      const lastMsg = state.messages[state.messages.length - 1];
+      if (lastMsg) Object.assign(lastMsg, action.payload);
     },
     updateLastMessage(state, action) {
       const lastMsg = state.messages[state.messages.length - 1];
@@ -67,11 +80,14 @@ export const {
   setChats,
   setLoadingChats,
   addChat,
+  updateChat,
   removeChat,
   setActiveChat,
   setMessages,
   setLoadingMessages,
   addMessage,
+  replaceLastMessage,
+  patchLastMessage,
   updateLastMessage,
   setStreaming,
   clearChat,

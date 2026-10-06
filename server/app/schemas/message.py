@@ -6,6 +6,7 @@ from uuid import UUID
 class MessageCreate(BaseModel):
     content: str
     model_id: str | None = None  # Optional — overrides selected model
+    smart_switch: bool | None = None  # Optional — overrides the chat's smart switch setting
 
 
 class MessageResponse(BaseModel):
