@@ -1,39 +1,39 @@
 # ===== PDF Chat AI — Backend Dependencies =====
 
 # Core
-fastapi[standard]
-uvicorn[standard]
+fastapi[standard]==0.142.2
+uvicorn[standard]==0.54.0
 
 # Database
-sqlalchemy[asyncio]
-asyncpg
+sqlalchemy[asyncio]==2.1.3
+asyncpg==0.31.0
 
 # Configuration
-pydantic-settings
+pydantic-settings==2.15.0
 
 # Authentication & Security
-python-jose[cryptography]
-passlib[bcrypt]
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 
 # Cache & Sessions
-redis[hiredis]
+redis[hiredis]==8.1.0
 
 # File Upload
-python-multipart
+python-multipart==0.0.32
 
 # Database Migrations
-alembic
+alembic==1.20.0
 
 # AI / LLM (Groq + Gemini via litellm)
-litellm
+litellm==1.104.0
 
 # PDF text extraction
-pypdf
+pypdf==6.19.0
 
 # Vector math for embeddings / similarity search
-numpy
+numpy==2.4.6
 
 # Testing
-pytest
-pytest-asyncio
+pytest==9.1.1
+pytest-asyncio==1.4.0

@@ -1,0 +1,39 @@
+# Render Blueprint for the FastAPI backend (free plan).
+# The frontend is deployed separately on Cloudflare Pages.
+# Secrets are marked `sync: false` — Render asks for them when the Blueprint is created.
+services:
+  - type: web
+    name: pdf-chat-ai-api
+    runtime: python
+    plan: free
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers: trust Render's X-Forwarded-For so per-IP rate limits
+    # see the real client instead of Render's proxy.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.4
+      - key: DEBUG
+        value: "False"
+      - key: COOKIE_SECURE
+        value: "True"
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: MAX_PDF_SIZE_MB
+        value: "15"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false   # e.g. ["https://your-app.pages.dev"]
+      - key: DATABASE_URL
+        sync: false   # Neon: postgresql+asyncpg://USER:PASS@HOST/DB?ssl=require
+      - key: REDIS_URL
+        sync: false   # Upstash: rediss://default:PASS@HOST:6379
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: NEMOTRON_API_KEY
+        sync: false

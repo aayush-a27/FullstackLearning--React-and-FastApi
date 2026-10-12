@@ -111,18 +111,20 @@ async def embed_texts(
 
         done = 0
 
-        async def run(batch: list[str]) -> list[list[float]]:
+        async def run(batch: list[str]) -> list[bytes]:
             nonlocal done
             async with semaphore:
                 vectors = await _embed_batch(client, batch, input_type)
             done += len(batch)
             if on_progress:
                 await on_progress(done, len(texts))
-            return vectors
+            # Pack right away: a vector as a Python float list is ~64 KB, packed
+            # it's 8 KB — holding a long book's worth unpacked used ~200 MB.
+            return [pack_vector(vector) for vector in vectors]
 
         results = await asyncio.gather(*(run(batch) for batch in batches))
 
-    return [pack_vector(vector) for batch in results for vector in batch]
+    return [packed for batch in results for packed in batch]
 
 
 async def embed_query(question: str) -> np.ndarray:
