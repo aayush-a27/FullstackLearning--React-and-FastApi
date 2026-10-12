@@ -1,0 +1,14 @@
+// Cloudflare Workers config for the React frontend.
+// Cloudflare runs `npm run build` (from client/), then `npx wrangler deploy`
+// uploads only the built ./dist folder.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "greenbookai",
+  "compatibility_date": "2026-10-06",
+  "assets": {
+    "directory": "./dist",
+    // React Router handles routes like /dashboard in the browser, so unknown
+    // paths must get index.html instead of a 404.
+    "not_found_handling": "single-page-application"
+  }
+}
