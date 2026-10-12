@@ -41,10 +41,14 @@ import tempfile  # noqa: E402
 
 TEST_UPLOAD_DIR = tempfile.mkdtemp(prefix="pdfchat_test_uploads_")
 os.environ["UPLOAD_DIR"] = TEST_UPLOAD_DIR
+# ...and never to real object storage, even if .env configures it
+for _name in ("S3_ENDPOINT_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_BUCKET"):
+    os.environ[_name] = ""
 
 get_settings.cache_clear()
 assert get_settings().DATABASE_URL == TEST_DB_URL
 assert get_settings().UPLOAD_DIR == TEST_UPLOAD_DIR
+assert not get_settings().S3_BUCKET
 
 settings = get_settings()
 

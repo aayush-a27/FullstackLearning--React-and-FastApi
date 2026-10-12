@@ -61,7 +61,8 @@ async def lifespan(app: FastAPI):
     # Create uploads directory
     import os
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    logger.info(f"Upload directory: {settings.UPLOAD_DIR}")
+    from app.services.file_storage import describe as describe_storage
+    logger.info(f"PDF storage: {describe_storage()}")
 
     # Restart any PDF indexing that a previous run left unfinished
     if db_ready:

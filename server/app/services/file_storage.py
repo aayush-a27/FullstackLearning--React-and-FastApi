@@ -34,6 +34,25 @@ def object_storage_enabled() -> bool:
     )
 
 
+def describe() -> str:
+    """One line for the startup log saying where PDFs will be stored."""
+    if object_storage_enabled():
+        if not re.fullmatch(r"https?://[^\s/]+/?", settings.S3_ENDPOINT_URL):
+            return (
+                f"INVALID S3_ENDPOINT_URL {settings.S3_ENDPOINT_URL!r} - it must be just "
+                "the URL, like https://s3.us-east-005.backblazeb2.com; uploads will fail"
+            )
+        return f"object storage, bucket {settings.S3_BUCKET!r} at {settings.S3_ENDPOINT_URL}"
+    names = ("S3_ENDPOINT_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_BUCKET")
+    missing = [name for name in names if not getattr(settings, name)]
+    if len(missing) < len(names):
+        return (
+            f"LOCAL DISK ({settings.UPLOAD_DIR}) - object storage is half-configured, "
+            f"missing: {', '.join(missing)}"
+        )
+    return f"local disk ({settings.UPLOAD_DIR}); set the S3_* variables to use object storage"
+
+
 def _region() -> str:
     """Signing region. B2 needs the one in its endpoint; R2 accepts "auto"."""
     if settings.S3_REGION:
