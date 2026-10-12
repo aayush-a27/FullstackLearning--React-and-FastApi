@@ -1,6 +1,5 @@
 import logging
 import shutil
-from datetime import date
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +10,6 @@ from app.database import get_db
 from app.schemas.user import (
     UserResponse,
     UserUpdate,
-    OnboardingData,
     DeleteAccountRequest,
 )
 from app.dependencies import get_current_user
@@ -83,29 +81,3 @@ async def delete_account(
 
     await invalidate(chat_list_key(user_id))
     logger.info("Deleted account %s", user_id)
-
-
-@router.patch("/me/onboarding", response_model=UserResponse)
-async def complete_onboarding(
-    data: OnboardingData,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Complete the onboarding process with language, purpose, and DOB."""
-    current_user.language = data.language
-    current_user.purpose = data.purpose
-
-    # Parse date of birth
-    try:
-        current_user.date_of_birth = date.fromisoformat(data.date_of_birth)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid date format. Use YYYY-MM-DD.",
-        )
-
-    current_user.is_onboarded = True
-
-    await db.flush()
-    await db.refresh(current_user)
-    return current_user

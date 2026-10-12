@@ -17,7 +17,7 @@ PDF Chat AI is a full-stack Retrieval-Augmented Generation (RAG) app built with 
 - **Auth**: JWT access tokens, a refresh token in an httpOnly cookie, and logout that really revokes tokens (Redis blacklist).
 - **Hardening**: per-user rate limits, security headers, a strict CORS allowlist, and ownership checks on every query.
 - **Redis caching** that falls back to Postgres if Redis is down.
-- Built-in PDF viewer, chat history, onboarding, profile and settings pages.
+- Built-in PDF viewer, chat history, profile and settings pages.
 
 ## Tech stack
 
@@ -130,7 +130,7 @@ All routes are prefixed with `/api/v1`. Full details are at `/docs`.
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout` |
-| Users | `GET/PATCH/DELETE /users/me`, `PATCH /users/me/onboarding` |
+| Users | `GET/PATCH/DELETE /users/me` |
 | PDFs | `POST /pdfs/upload`, `GET /pdfs`, `GET /pdfs/{id}`, `GET /pdfs/{id}/view`, `DELETE /pdfs/{id}` |
 | Chats | `GET/POST /chats`, `GET/PATCH/DELETE /chats/{id}`, `POST /chats/{id}/pdfs` |
 | Messages | `GET /chats/{id}/messages`, `POST /chats/{id}/messages`, `POST /chats/{id}/messages/stream` (SSE) |

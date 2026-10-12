@@ -10,18 +10,12 @@ const initialState = {
   // Drag-and-drop state
   draggingPanel: null,       // panel id being dragged
   dropTarget: null,          // panel id being hovered over
-  // Legacy (kept for Profile/Settings pages if needed)
-  activeModal: null,         // 'profile' | 'settings' | 'upload' | null
-  isMobile: false,
 };
 
 const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    setPanelOrder(state, action) {
-      state.panelOrder = action.payload;
-    },
     swapPanels(state, action) {
       const { fromIndex, toIndex } = action.payload;
       const newOrder = [...state.panelOrder];
@@ -39,27 +33,14 @@ const uiSlice = createSlice({
     setDropTarget(state, action) {
       state.dropTarget = action.payload;
     },
-    openModal(state, action) {
-      state.activeModal = action.payload;
-    },
-    closeModal(state) {
-      state.activeModal = null;
-    },
-    setMobile(state, action) {
-      state.isMobile = action.payload;
-    },
   },
 });
 
 export const {
-  setPanelOrder,
   swapPanels,
   setPanelWidths,
   setDraggingPanel,
   setDropTarget,
-  openModal,
-  closeModal,
-  setMobile,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

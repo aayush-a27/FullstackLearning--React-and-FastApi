@@ -29,13 +29,6 @@ export const AI_MODELS = [
   },
 ];
 
-// Smart Switch complexity thresholds
-export const COMPLEXITY = {
-  SIMPLE: 'simple',       // Quick factual lookups → use mini/fast model
-  MODERATE: 'moderate',   // Analysis, summaries → use standard model
-  COMPLEX: 'complex',     // Deep reasoning, comparisons → use premium model
-};
-
 // PDF upload constraints (smart multi-PDF limits)
 export const PDF_LIMITS = {
   MAX_FILE_SIZE_MB: 50,
@@ -48,27 +41,11 @@ export const PDF_LIMITS = {
   LARGE_PDF_MAX_FILES: 1,
 };
 
-// Onboarding options
-export const LANGUAGES = [
-  'English', 'Hindi', 'Spanish', 'French', 'German',
-  'Chinese', 'Japanese', 'Korean', 'Arabic', 'Portuguese',
-];
-
-export const PURPOSES = [
-  { id: 'student_research', label: 'Student Research', icon: '🎓' },
-  { id: 'deep_research', label: 'Deep Research', icon: '🔬' },
-  { id: 'content_writing', label: 'Content Writing', icon: '✍️' },
-  { id: 'legal_review', label: 'Legal Review', icon: '⚖️' },
-  { id: 'business_analysis', label: 'Business Analysis', icon: '📊' },
-  { id: 'personal_reading', label: 'Personal Reading', icon: '📚' },
-];
-
 // Route paths
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
   SIGNUP: '/signup',
-  ONBOARDING: '/onboarding',
   DASHBOARD: '/dashboard',
   CHAT: '/chat/:chatId',
   PROFILE: '/profile',

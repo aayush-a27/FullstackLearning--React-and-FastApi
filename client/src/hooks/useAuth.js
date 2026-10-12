@@ -7,7 +7,6 @@ import {
   loginSuccess,
   loginFailure,
   logout as logoutAction,
-  completeOnboarding,
   updateUser,
   setInitialized,
 } from '../features/auth/authSlice';
@@ -31,12 +30,7 @@ export function useAuth() {
           accessToken: data.access_token,
         })
       );
-      // Redirect based on onboarding status
-      if (!data.user.is_onboarded) {
-        navigate(ROUTES.ONBOARDING);
-      } else {
-        navigate(ROUTES.DASHBOARD);
-      }
+      navigate(ROUTES.DASHBOARD);
     } catch (err) {
       dispatch(loginFailure(err.response?.data?.detail || 'Login failed'));
     }
@@ -58,7 +52,7 @@ export function useAuth() {
           accessToken: data.access_token,
         })
       );
-      navigate(ROUTES.ONBOARDING);
+      navigate(ROUTES.DASHBOARD);
     } catch (err) {
       dispatch(loginFailure(err.response?.data?.detail || 'Registration failed'));
     }
@@ -73,17 +67,6 @@ export function useAuth() {
     localStorage.removeItem('accessToken');
     dispatch(logoutAction());
     navigate(ROUTES.LOGIN);
-  };
-
-  const submitOnboarding = async (onboardingData) => {
-    try {
-      await axiosInstance.patch(USERS.ONBOARDING, onboardingData);
-      dispatch(completeOnboarding());
-      dispatch(updateUser(onboardingData));
-      navigate(ROUTES.DASHBOARD);
-    } catch (err) {
-      dispatch(loginFailure(err.response?.data?.detail || 'Onboarding failed'));
-    }
   };
 
   /** Save a profile/preference change and update the store. */
@@ -131,7 +114,6 @@ export function useAuth() {
     login,
     register,
     logout,
-    submitOnboarding,
     saveProfile,
     deleteAccount,
     fetchUser,

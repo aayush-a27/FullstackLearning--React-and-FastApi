@@ -5,7 +5,6 @@ import AuthLayout from '../components/layout/AuthLayout';
 import AppLayout from '../components/layout/AppLayout';
 import Login from '../pages/Login';
 import Signup from '../pages/Signup';
-import Onboarding from '../pages/Onboarding';
 import Dashboard from '../pages/Dashboard';
 import Profile from '../pages/Profile';
 import Settings from '../pages/Settings';
@@ -22,7 +21,6 @@ export default function AppRoutes() {
 
       {/* Protected routes — require authentication */}
       <Route element={<ProtectedRoute />}>
-        <Route path={ROUTES.ONBOARDING} element={<Onboarding />} />
         <Route element={<AppLayout />}>
           <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
           <Route path={ROUTES.CHAT} element={<Dashboard />} />

@@ -82,20 +82,6 @@ export default function Profile() {
           disabled
         />
 
-        {/* Read-only onboarding data */}
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <div className="bg-surface-800 rounded-xl px-4 py-3 border border-glass-border">
-            <p className="text-xs text-text-muted mb-0.5">Language</p>
-            <p className="text-sm text-text-primary">{user?.language || 'Not set'}</p>
-          </div>
-          <div className="bg-surface-800 rounded-xl px-4 py-3 border border-glass-border">
-            <p className="text-xs text-text-muted mb-0.5">Purpose</p>
-            <p className="text-sm text-text-primary capitalize">
-              {user?.purpose?.replace('_', ' ') || 'Not set'}
-            </p>
-          </div>
-        </div>
-
         {saveError && (
           <p className="text-xs text-danger bg-danger/10 px-3 py-2 rounded-lg">{saveError}</p>
         )}

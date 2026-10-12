@@ -66,10 +66,6 @@ const chatSlice = createSlice({
     setStreaming(state, action) {
       state.isStreaming = action.payload;
     },
-    clearChat(state) {
-      state.activeChatId = null;
-      state.messages = [];
-    },
     setChatError(state, action) {
       state.error = action.payload;
     },
@@ -90,7 +86,6 @@ export const {
   patchLastMessage,
   updateLastMessage,
   setStreaming,
-  clearChat,
   setChatError,
 } = chatSlice.actions;
 

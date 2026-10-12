@@ -38,14 +38,6 @@ const authSlice = createSlice({
     updateUser(state, action) {
       state.user = { ...state.user, ...action.payload };
     },
-    completeOnboarding(state) {
-      if (state.user) {
-        state.user.is_onboarded = true;
-      }
-    },
-    clearError(state) {
-      state.error = null;
-    },
     setInitialized(state) {
       state.isInitialized = true;
     },
@@ -58,8 +50,6 @@ export const {
   loginFailure,
   logout,
   updateUser,
-  completeOnboarding,
-  clearError,
   setInitialized,
 } = authSlice.actions;
 

@@ -35,18 +35,17 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
 
     # AI Model API Keys (optional — set via .env)
-    OPENAI_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    ANTHROPIC_API_KEY: str = ""
     NEMOTRON_API_KEY: str = ""
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
 
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        # Old .env files may still list settings that were removed
+        "extra": "ignore",
     }
 
 

@@ -1,12 +1,22 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { AI_MODELS } from '../../utils/constants';
 
+// Remembered across reloads; app/store.js writes it back when it changes
+export const SMART_SWITCH_KEY = 'smartSwitchEnabled';
+
+function loadSmartSwitch() {
+  try {
+    return localStorage.getItem(SMART_SWITCH_KEY) !== 'false'; // on by default
+  } catch {
+    return true; // storage blocked (private mode, etc.)
+  }
+}
+
 const initialState = {
   selectedModel: AI_MODELS[0],          // Default to first model (Nemotron Super)
-  smartSwitchEnabled: true,             // Smart switch on by default
+  smartSwitchEnabled: loadSmartSwitch(),
   availableModels: AI_MODELS,
   modelHealth: {},                       // { 'groq': 'healthy', 'google': 'degraded', ... }
-  fallbackChain: ['nemotron-super', 'gemini-flash', 'groq-fast'],
 };
 
 const modelSlice = createSlice({
@@ -29,13 +39,6 @@ const modelSlice = createSlice({
       // action.payload = { groq: 'healthy', google: 'degraded', nvidia: 'down' }
       state.modelHealth = action.payload;
     },
-    updateModelHealth(state, action) {
-      // action.payload = { provider: 'openai', status: 'healthy' | 'degraded' | 'down' }
-      state.modelHealth[action.payload.provider] = action.payload.status;
-    },
-    setFallbackChain(state, action) {
-      state.fallbackChain = action.payload;
-    },
   },
 });
 
@@ -44,8 +47,6 @@ export const {
   toggleSmartSwitch,
   setSmartSwitch,
   setModelHealth,
-  updateModelHealth,
-  setFallbackChain,
 } = modelSlice.actions;
 
 export default modelSlice.reducer;

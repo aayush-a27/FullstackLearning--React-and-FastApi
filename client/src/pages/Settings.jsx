@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import toast from 'react-hot-toast';
-import { Monitor, Bell, Shield, Trash2, AlertTriangle } from 'lucide-react';
+import { Shield, Trash2, AlertTriangle } from 'lucide-react';
 import { setSmartSwitch } from '../features/model/modelSlice';
 import { useAuth } from '../hooks/useAuth';
 import { getFriendlyError } from '../utils/helpers';
@@ -57,26 +57,12 @@ function Row({ label, description, children }) {
 export default function Settings() {
   const dispatch = useDispatch();
   const { smartSwitchEnabled } = useSelector((state) => state.model);
-  const { user, saveProfile, deleteAccount } = useAuth();
+  const { deleteAccount } = useAuth();
 
-  const [savingNotifications, setSavingNotifications] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [password, setPassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
-
-  const emailNotifications = user?.email_notifications ?? false;
-
-  const handleNotificationsToggle = async () => {
-    setSavingNotifications(true);
-    try {
-      await saveProfile({ email_notifications: !emailNotifications });
-      toast.success(emailNotifications ? 'Email updates turned off' : 'Email updates turned on');
-    } catch (err) {
-      toast.error(getFriendlyError(err, "Couldn't save that setting. Please try again."));
-    }
-    setSavingNotifications(false);
-  };
 
   const handleDelete = async (e) => {
     e.preventDefault();
@@ -99,12 +85,6 @@ export default function Settings() {
       <h1 className="text-2xl font-bold text-text-primary mb-6 pr-10">Settings</h1>
 
       <div className="space-y-6">
-        <Section icon={Monitor} title="Appearance">
-          <Row label="Theme" description="Dark theme is active (default)">
-            <span className="text-sm text-text-muted">Dark Green</span>
-          </Row>
-        </Section>
-
         <Section icon={Shield} title="AI Preferences">
           <Row
             label="Smart Model Switch"
@@ -114,20 +94,6 @@ export default function Settings() {
               label="Smart Model Switch"
               checked={smartSwitchEnabled}
               onChange={() => dispatch(setSmartSwitch(!smartSwitchEnabled))}
-            />
-          </Row>
-        </Section>
-
-        <Section icon={Bell} title="Notifications">
-          <Row
-            label="Email Notifications"
-            description="Receive updates about new features. Saved to your account; no emails are sent yet."
-          >
-            <Toggle
-              label="Email Notifications"
-              checked={emailNotifications}
-              disabled={savingNotifications}
-              onChange={handleNotificationsToggle}
             />
           </Row>
         </Section>

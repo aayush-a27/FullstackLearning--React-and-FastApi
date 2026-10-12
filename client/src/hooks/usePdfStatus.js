@@ -12,11 +12,6 @@ export function isPdfIndexing(pdf) {
   return pdf?.status === 'pending' || pdf?.status === 'processing';
 }
 
-/** True once the text is searchable, even if the summary is still being written. */
-export function isPdfReady(pdf) {
-  return pdf?.status === 'ready';
-}
-
 /** Searchable, but the whole-document summary isn't finished yet. */
 export function isSummaryWriting(pdf) {
   return (

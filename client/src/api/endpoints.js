@@ -9,7 +9,6 @@ export const AUTH = {
 
 export const USERS = {
   ME: '/users/me',
-  ONBOARDING: '/users/me/onboarding',
   UPDATE_PROFILE: '/users/me',
   DELETE_ACCOUNT: '/users/me',
 };
