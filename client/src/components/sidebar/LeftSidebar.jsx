@@ -7,7 +7,8 @@ import ChatHistoryItem from './ChatHistoryItem';
 import Button from '../common/Button';
 import Loader from '../common/Loader';
 
-export default function ChatHistoryPanel() {
+/** `onOpen` (optional) runs when a chat is opened or a new one started. */
+export default function ChatHistoryPanel({ onOpen }) {
   const {
     chats,
     activeChatId,
@@ -28,6 +29,7 @@ export default function ChatHistoryPanel() {
     // /dashboard is "new chat"; clear directly too in case we're already there
     navigate(ROUTES.DASHBOARD);
     selectChat(null);
+    onOpen?.();
   };
 
   return (
@@ -64,6 +66,7 @@ export default function ChatHistoryPanel() {
               key={chat.id}
               chat={chat}
               isActive={chat.id === activeChatId}
+              onOpen={onOpen}
               onRename={(title) => renameChat(chat.id, title)}
               onDelete={() => deleteChat(chat.id)}
             />

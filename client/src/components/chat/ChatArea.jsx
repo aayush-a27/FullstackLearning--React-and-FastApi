@@ -5,6 +5,7 @@ import ChatBubble from './ChatBubble';
 import Loader from '../common/Loader';
 import { PdfPreparingCard } from './PdfProcessingStatus';
 import { isPdfIndexing } from '../../hooks/usePdfStatus';
+import { PDF_LIMITS } from '../../utils/constants';
 
 export default function ChatArea() {
   const { messages, isStreaming, isLoadingMessages, activeChatId } = useSelector(
@@ -36,7 +37,7 @@ export default function ChatArea() {
           </p>
           <div className="flex items-center gap-2 mt-4 text-xs text-text-muted">
             <FileText size={14} />
-            <span>Supports PDF files up to 50MB</span>
+            <span>Supports PDF files up to {PDF_LIMITS.MAX_FILE_SIZE_MB}MB</span>
           </div>
         </div>
       ) : isLoadingMessages ? (

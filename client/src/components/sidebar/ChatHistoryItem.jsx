@@ -7,7 +7,7 @@ import { chatPath } from '../../utils/constants';
 const MAX_TITLE_LENGTH = 255;
 
 // A real link, so the chat's URL can be copied, opened in a new tab, or bookmarked
-export default function ChatHistoryItem({ chat, isActive, onRename, onDelete }) {
+export default function ChatHistoryItem({ chat, isActive, onOpen, onRename, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(chat.title);
   const inputRef = useRef(null);
@@ -67,6 +67,7 @@ export default function ChatHistoryItem({ chat, isActive, onRename, onDelete }) 
     <Link
       to={chatPath(chat.id)}
       aria-current={isActive ? 'page' : undefined}
+      onClick={onOpen}
       onDoubleClick={startEditing}
       className={`group flex items-center gap-1 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200 ${
         isActive
@@ -86,10 +87,10 @@ export default function ChatHistoryItem({ chat, isActive, onRename, onDelete }) 
         <p className="text-xs text-text-muted mt-0.5">{timeAgo(chat.created_at)}</p>
       </div>
 
-      {/* Rename / delete — visible on hover */}
+      {/* Rename / delete — visible on hover, always on touch screens */}
       <button
         onClick={startEditing}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-primary-500/15 text-text-muted hover:text-primary-400 transition-all duration-150"
+        className="opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 p-1 rounded-lg hover:bg-primary-500/15 text-text-muted hover:text-primary-400 transition-all duration-150"
         aria-label={`Rename ${chat.title}`}
       >
         <Pencil size={13} />
@@ -101,7 +102,7 @@ export default function ChatHistoryItem({ chat, isActive, onRename, onDelete }) 
           e.stopPropagation();
           onDelete();
         }}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-danger/15 text-text-muted hover:text-danger transition-all duration-150"
+        className="opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 p-1 rounded-lg hover:bg-danger/15 text-text-muted hover:text-danger transition-all duration-150"
         aria-label={`Delete ${chat.title}`}
       >
         <Trash2 size={14} />

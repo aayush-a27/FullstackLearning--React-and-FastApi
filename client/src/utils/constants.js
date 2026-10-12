@@ -31,8 +31,8 @@ export const AI_MODELS = [
 
 // PDF upload constraints (smart multi-PDF limits)
 export const PDF_LIMITS = {
-  MAX_FILE_SIZE_MB: 50,
-  MAX_FILE_SIZE_BYTES: 50 * 1024 * 1024,
+  MAX_FILE_SIZE_MB: 15,                  // keep in step with the server's MAX_PDF_SIZE_MB
+  MAX_FILE_SIZE_BYTES: 15 * 1024 * 1024,
   // Page-count based multi-PDF rules
   SMALL_PDF_MAX_PAGES: 5,
   SMALL_PDF_MAX_FILES: 5,

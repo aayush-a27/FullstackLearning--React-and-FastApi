@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { X } from 'lucide-react';
+import { X, MessageSquare, FileText, Sparkles } from 'lucide-react';
 import { setPanelWidths } from '../../features/ui/uiSlice';
 import { ROUTES, MODAL_ROUTES, chatPath } from '../../utils/constants';
 import { usePdfStatus } from '../../hooks/usePdfStatus';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import Navbar from './Navbar';
 import PanelWrapper from './PanelWrapper';
 import ResizeHandle from './ResizeHandle';
@@ -16,10 +17,10 @@ import ChatInput from '../chat/ChatInput';
 const MIN_PANEL_PCT = 10; // Minimum 10% width per panel
 
 // Map panel IDs to their React content
-function PanelContent({ panelId }) {
+function PanelContent({ panelId, onChatOpened }) {
   switch (panelId) {
     case 'history':
-      return <ChatHistoryPanel />;
+      return <ChatHistoryPanel onOpen={onChatOpened} />;
     case 'pdfViewer':
       return <PdfViewer />;
     case 'chat':
@@ -34,10 +35,63 @@ function PanelContent({ panelId }) {
   }
 }
 
+// Phones get one panel at a time, picked from a tab bar
+const MOBILE_TABS = [
+  { id: 'history', label: 'History', icon: MessageSquare },
+  { id: 'pdfViewer', label: 'PDF', icon: FileText },
+  { id: 'chat', label: 'Chat', icon: Sparkles },
+];
+
+function MobileTabs({ activeTab, onChange }) {
+  return (
+    <nav
+      role="tablist"
+      aria-label="Sections"
+      className="relative z-10 flex gap-1 p-1 mx-3 mt-2 rounded-xl glass border border-glass-border"
+    >
+      {MOBILE_TABS.map(({ id, label, icon: Icon }) => {
+        const active = id === activeTab;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm transition-colors ${
+              active
+                ? 'bg-primary-600/20 text-primary-300 font-semibold'
+                : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            <Icon size={15} />
+            {label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function MobileLayout() {
+  const [activeTab, setActiveTab] = useState('chat');
+
+  return (
+    <>
+      <MobileTabs activeTab={activeTab} onChange={setActiveTab} />
+      <div role="tabpanel" className="relative z-10 flex-1 min-h-0 m-3 mt-2 rounded-xl overflow-hidden glass border border-glass-border">
+        {/* Opening (or starting) a chat from History jumps straight to it */}
+        <PanelContent panelId={activeTab} onChatOpened={() => setActiveTab('chat')} />
+      </div>
+    </>
+  );
+}
+
 export default function AppLayout() {
   const dispatch = useDispatch();
   const { panelOrder, panelWidths } = useSelector((state) => state.ui);
   const containerRef = useRef(null);
+  const isMobile = useIsMobile();
 
   // Keep PDF indexing status fresh while documents are being processed
   usePdfStatus();
@@ -91,7 +145,8 @@ export default function AppLayout() {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-radial-gradient overflow-hidden">
+    // dvh, not vh: on phones vh ignores the browser's address bar
+    <div className="h-dvh flex flex-col bg-radial-gradient overflow-hidden">
       {/* Ambient background effects */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-500/8 rounded-full blur-3xl" />
@@ -100,7 +155,10 @@ export default function AppLayout() {
       {/* Top Navbar */}
       <Navbar />
 
-      {/* 3-Panel Area */}
+      {isMobile ? (
+        <MobileLayout />
+      ) : (
+      /* 3-Panel Area */
       <div
         ref={containerRef}
         className="relative z-10 flex-1 flex min-h-0"
@@ -125,6 +183,7 @@ export default function AppLayout() {
           </div>
         ))}
       </div>
+      )}
 
       {/* Outlet for Profile/Settings pages rendered as overlays */}
       <OutletOverlay />
