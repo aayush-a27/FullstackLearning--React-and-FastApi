@@ -94,6 +94,24 @@ async def test_view_endpoint_returns_the_file(auth_client):
     assert response.content.startswith(b"%PDF")
 
 
+async def test_view_explains_a_file_lost_from_disk(auth_client):
+    """Free hosting wipes local disk on redeploy; the record outlives the file."""
+    from pathlib import Path
+    from app.config import get_settings
+
+    pdf_id = (await _upload(auth_client)).json()["id"]
+    await _wait_until_ready(auth_client, pdf_id)
+    user_id = (await auth_client.get("/users/me")).json()["id"]
+    for path in (Path(get_settings().UPLOAD_DIR) / user_id).glob("*.pdf"):
+        path.unlink()
+
+    response = await auth_client.get(f"/pdfs/{pdf_id}/view")
+    assert response.status_code == 410
+    assert "no longer stored" in response.json()["detail"]
+    # The document itself is still there to chat about
+    assert (await auth_client.get(f"/pdfs/{pdf_id}")).status_code == 200
+
+
 async def test_view_requires_authentication(auth_client):
     pdf_id = (await _upload(auth_client)).json()["id"]
     response = await auth_client.get(f"/pdfs/{pdf_id}/view", headers={"Authorization": ""})

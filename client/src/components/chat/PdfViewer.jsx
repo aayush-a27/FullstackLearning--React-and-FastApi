@@ -74,9 +74,19 @@ export default function PdfViewer() {
         objectUrl = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
         setViewState({ pdfId: activePdfId, url: objectUrl, error: null });
       })
-      .catch(() => {
+      .catch(async (err) => {
+        let message = 'Could not load this PDF.';
+        // 410: the file itself is gone; the server explains why. With
+        // responseType 'blob' the error body arrives as a Blob too.
+        if (err.response?.status === 410) {
+          try {
+            message = JSON.parse(await err.response.data.text()).detail || message;
+          } catch {
+            // keep the generic message
+          }
+        }
         if (!cancelled) {
-          setViewState({ pdfId: activePdfId, url: null, error: 'Could not load this PDF.' });
+          setViewState({ pdfId: activePdfId, url: null, error: message });
         }
       });
 

@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # App
-    APP_NAME: str = "PDF Chat AI"
+    APP_NAME: str = "Green Book AI"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
@@ -32,7 +32,14 @@ class Settings(BaseSettings):
 
     # PDF Upload
     MAX_PDF_SIZE_MB: int = 50
-    UPLOAD_DIR: str = "uploads"
+    UPLOAD_DIR: str = "uploads"  # used only when R2 isn't configured
+
+    # Cloudflare R2 for uploaded PDFs (see app/services/file_storage.py).
+    # Leave empty to keep files in UPLOAD_DIR instead.
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = ""
 
     # AI Model API Keys (optional — set via .env)
     GOOGLE_API_KEY: str = ""

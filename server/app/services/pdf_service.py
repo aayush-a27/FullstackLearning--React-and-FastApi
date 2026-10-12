@@ -1,15 +1,11 @@
-import os
 import uuid
-from pathlib import Path
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.pdf_document import PdfDocument
-from app.config import get_settings
+from app.services.file_storage import save_pdf, delete_pdf_file
 import io
 import pypdf
-
-settings = get_settings()
 
 
 class InvalidPdfError(Exception):
@@ -22,37 +18,27 @@ async def save_uploaded_pdf(
     user_id: uuid.UUID,
 ) -> PdfDocument:
     """
-    Save an uploaded PDF to disk and create its DB record.
+    Store an uploaded PDF (R2 or local disk) and create its DB record.
 
     Only the page count is read here — text extraction, chunking and embedding
     happen in the background (app/services/pdf_processing.py) so large uploads
     return immediately instead of timing out the browser.
     """
-    upload_dir = Path(settings.UPLOAD_DIR) / str(user_id)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    file_ext = Path(file.filename).suffix
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = upload_dir / unique_filename
-
     content = await file.read()
-    file_size = len(content)
 
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Cheap: reads the page tree, not the page contents
+    # Validate before storing anything. Cheap: reads the page tree, not the pages.
     try:
         page_count = len(pypdf.PdfReader(io.BytesIO(content)).pages)
     except Exception as e:
-        os.remove(file_path)
         raise InvalidPdfError("This file isn't a readable PDF.") from e
+
+    storage_path = await save_pdf(user_id, content)
 
     pdf_doc = PdfDocument(
         user_id=user_id,
         filename=file.filename,
-        storage_path=str(file_path),
-        file_size_bytes=file_size,
+        storage_path=storage_path,
+        file_size_bytes=len(content),
         page_count=page_count,
         status="pending",
     )
@@ -89,12 +75,7 @@ async def delete_pdf(db: AsyncSession, pdf_id: uuid.UUID, user_id: uuid.UUID) ->
     if not pdf:
         return False
 
-    # Delete file from disk
-    try:
-        os.remove(pdf.storage_path)
-    except OSError:
-        pass
-
+    await delete_pdf_file(pdf.storage_path)
     await db.delete(pdf)
     return True
 

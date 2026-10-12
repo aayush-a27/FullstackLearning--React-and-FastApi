@@ -166,8 +166,11 @@ Tests create a throwaway `<your db>_test` database and a temporary upload folder
 | `REDIS_URL` | `rediss://default:PASS@HOST:6379` |
 | `ALLOWED_ORIGINS` | `["https://your-app.pages.dev"]` (JSON list, no trailing slash) |
 | `GROQ_API_KEY`, `GOOGLE_API_KEY`, `NEMOTRON_API_KEY` | your keys |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Cloudflare R2, for uploaded PDFs (see below) |
 
 These are already set by the Blueprint: `DEBUG=False`, `COOKIE_SECURE=True`, `COOKIE_SAMESITE=none`, `MAX_PDF_SIZE_MB=15`, a generated `JWT_SECRET_KEY`, and `PYTHON_VERSION=3.11.4`. Migrations run on startup.
+
+**R2 for uploaded PDFs.** In Cloudflare: R2 Object Storage → Create bucket (e.g. `greenbook-pdfs`, keep it private). Then R2 → Manage API tokens → Create API token with **Object Read & Write** on that bucket only. Put the token's Access Key ID and Secret Access Key, your Account ID (shown on the R2 overview page) and the bucket name into the four `R2_*` variables on Render.
 
 **3. Frontend on Cloudflare Pages.** Connect the repo with:
 - Root directory: `client`
@@ -180,7 +183,7 @@ Once the Pages URL is known, put it in `ALLOWED_ORIGINS` on Render.
 **Free-tier limits to know about**
 - Render sleeps after 15 minutes without traffic; the first request afterwards takes about a minute.
 - Memory is 512 MB. Measured locally, the server idles at ~260 MB and peaks at ~330 MB while indexing a 755-page book.
-- Render's disk is wiped on every restart and redeploy. Chat and search keep working (chunks live in Postgres), but the PDF viewer loses the original files. Moving uploads to object storage (Cloudflare R2) is on the roadmap.
+- Render's disk is wiped on every restart and redeploy, so uploaded PDFs are stored in Cloudflare R2 (10 GB free). Without the `R2_*` variables, files go to `UPLOAD_DIR` and vanish on the next redeploy; chat still works, but the viewer can't show them.
 - The frontend and backend are on different sites, so the refresh-token cookie is a cross-site cookie. Browsers that block those (Safari by default) log users out when the 30-minute access token expires. Serving both from one domain you own (`app.example.com` + `api.example.com`) avoids this.
 
 ## Security
@@ -194,7 +197,7 @@ Security choices and pre-deployment steps are documented in [`server/SECURITY.md
 - [ ] Hybrid search (keyword + vector) with reranking
 - [ ] pgvector HNSW index with a ≤2000-dimension embedding model
 - [ ] Dedicated job queue (Celery / arq) for background processing
-- [ ] Object storage (Cloudflare R2 / S3) for uploaded files
+- [x] Object storage (Cloudflare R2) for uploaded files
 - [ ] Email verification and password reset
 
 ## Author

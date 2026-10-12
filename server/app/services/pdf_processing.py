@@ -19,6 +19,7 @@ from app.models.pdf_section import PdfSection
 from app.services.ai_service import ai_service, AIServiceError
 from app.services.chunking import chunk_pages, group_chunks_into_sections
 from app.services.embedding_service import EmbeddingError, embed_texts, is_configured
+from app.services.file_storage import read_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -105,10 +106,8 @@ class _ProgressReporter:
             await db.commit()
 
 
-def _extract_pages(path: str) -> list[str]:
-    """Read per-page text from a PDF on disk (blocking — call via to_thread)."""
-    with open(path, "rb") as f:
-        content = f.read()
+def _extract_pages(content: bytes) -> list[str]:
+    """Read per-page text from PDF bytes (blocking — call via to_thread)."""
     reader = pypdf.PdfReader(io.BytesIO(content))
     return [(page.extract_text() or "") for page in reader.pages]
 
@@ -151,7 +150,17 @@ async def _process_pdf(pdf_id: UUID):
     progress = _ProgressReporter(pdf_id, "progress")
     await progress.set(2, force=True)
 
-    pages = await asyncio.to_thread(_extract_pages, storage_path)
+    content = await read_pdf(storage_path)
+    if content is None:
+        await _set_status(
+            pdf_id,
+            status="failed",
+            message="The uploaded file is no longer stored. Please upload it again.",
+            summary_status="failed",
+        )
+        return
+    pages = await asyncio.to_thread(_extract_pages, content)
+    del content  # don't hold the raw file through the embedding phase
     full_text = "\n".join(pages).strip()
     await progress.set(10, force=True)
 

@@ -57,10 +57,14 @@ export async function streamMessage({ chatId, body, onEvent, signal }) {
   if (response.status === 401) {
     try {
       token = await refreshAccessToken();
-    } catch {
+    } catch (err) {
+      // Server unreachable (asleep or restarting): keep the login, let them retry
+      if (!err.response || err.response.status >= 500) {
+        throw new Error("Couldn't reach the server. Please try again in a moment.", { cause: err });
+      }
       localStorage.removeItem('accessToken');
       window.location.href = '/login';
-      throw new Error('Your session expired. Please sign in again.');
+      throw new Error('Your session expired. Please sign in again.', { cause: err });
     }
     response = await postStream(url, body, token, signal);
   }

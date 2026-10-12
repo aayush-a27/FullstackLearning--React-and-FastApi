@@ -1,9 +1,6 @@
 import logging
-import shutil
-from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.config import get_settings
 from app.core.cache import chat_list_key, invalidate
 from app.core.security import verify_password
 from app.database import get_db
@@ -15,8 +12,8 @@ from app.schemas.user import (
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services.auth_service import get_user_by_username
+from app.services.file_storage import delete_user_files
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -76,8 +73,8 @@ async def delete_account(
     await db.delete(current_user)  # chats, messages, PDFs cascade
     await db.flush()
 
-    # Remove the user's uploaded files from disk
-    shutil.rmtree(Path(settings.UPLOAD_DIR) / str(user_id), ignore_errors=True)
+    # Remove the user's uploaded files (R2 or local disk)
+    await delete_user_files(user_id)
 
     await invalidate(chat_list_key(user_id))
     logger.info("Deleted account %s", user_id)

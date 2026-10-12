@@ -42,9 +42,12 @@ axiosInstance.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        // Refresh failed — clear auth and redirect to login
-        localStorage.removeItem('accessToken');
-        window.location.href = '/login';
+        // Only a real answer from the server ends the session; if the server
+        // is unreachable (asleep or restarting), keep the login for a retry.
+        if (refreshError.response && refreshError.response.status < 500) {
+          localStorage.removeItem('accessToken');
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }

@@ -26,7 +26,7 @@ export default function Navbar() {
           </svg>
         </div>
         <span className="text-sm font-semibold text-text-primary">
-          PDF Chat AI
+          Green Book AI
         </span>
       </Link>
 

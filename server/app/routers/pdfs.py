@@ -1,7 +1,7 @@
-import os
+from urllib.parse import quote
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.pdf import PdfResponse, PdfUploadResponse
@@ -13,6 +13,7 @@ from app.services.pdf_service import (
     InvalidPdfError,
 )
 from app.services.pdf_processing import schedule_processing
+from app.services.file_storage import read_pdf
 from app.core.cache import chat_list_key, invalidate
 from app.core.rate_limit import rate_limited, UPLOAD_LIMIT
 from app.dependencies import get_current_user
@@ -115,16 +116,25 @@ async def view_pdf(
 ):
     """Stream the PDF file itself so the browser can display it inline."""
     pdf = await get_pdf_by_id(db, pdf_id, current_user.id)
-    if not pdf or not os.path.isfile(pdf.storage_path):
+    if not pdf:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="PDF not found",
         )
-    return FileResponse(
-        pdf.storage_path,
+    content = await read_pdf(pdf.storage_path)
+    if content is None:
+        # The record and its search index survive, but the file is gone — e.g.
+        # uploaded to local disk before R2 was set up, then wiped by a redeploy.
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="The original file is no longer stored, so it can't be shown. "
+            "You can still chat about it, or upload it again to view it.",
+        )
+    # Inline disposition; filename* handles non-ASCII names (RFC 5987)
+    return Response(
+        content,
         media_type="application/pdf",
-        filename=pdf.filename,
-        content_disposition_type="inline",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(pdf.filename)}"},
     )
 
 

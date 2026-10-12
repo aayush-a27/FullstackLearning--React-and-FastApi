@@ -12,6 +12,10 @@ import {
 } from '../features/auth/authSlice';
 import { ROUTES } from '../utils/constants';
 
+// How long to keep retrying while the backend wakes up (Render free tier: ~1 min)
+const SERVER_WAKE_TIMEOUT_MS = 120_000;
+const SERVER_WAKE_RETRY_MS = 5_000;
+
 export function useAuth() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -85,22 +89,40 @@ export function useAuth() {
   };
 
   const fetchUser = async () => {
+    if (!localStorage.getItem('accessToken')) {
+      dispatch(setInitialized());
+      return;
+    }
+    // The free-tier server sleeps and restarts on every deploy; until it's up,
+    // requests fail without a response or with a 5xx. That says nothing about
+    // the login, so keep the token and retry instead of logging out.
+    const deadline = Date.now() + SERVER_WAKE_TIMEOUT_MS;
     try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        dispatch(setInitialized());
-        return;
+      for (;;) {
+        try {
+          const { data } = await axiosInstance.get(USERS.ME);
+          dispatch(
+            loginSuccess({
+              user: data,
+              // Re-read: the refresh interceptor may have just replaced it
+              accessToken: localStorage.getItem('accessToken'),
+            })
+          );
+          return;
+        } catch (err) {
+          const serverUnavailable = !err.response || err.response.status >= 500;
+          if (serverUnavailable && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, SERVER_WAKE_RETRY_MS));
+            continue;
+          }
+          if (!serverUnavailable) {
+            // The server answered and rejected the session
+            localStorage.removeItem('accessToken');
+          }
+          dispatch(logoutAction());
+          return;
+        }
       }
-      const { data } = await axiosInstance.get(USERS.ME);
-      dispatch(
-        loginSuccess({
-          user: data,
-          accessToken: token,
-        })
-      );
-    } catch {
-      localStorage.removeItem('accessToken');
-      dispatch(logoutAction());
     } finally {
       dispatch(setInitialized());
     }

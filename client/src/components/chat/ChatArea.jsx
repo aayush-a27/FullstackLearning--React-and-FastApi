@@ -29,7 +29,7 @@ export default function ChatArea() {
           <div className="w-16 h-16 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mb-4 animate-pulse-glow">
             <Sparkles size={28} className="text-primary-400" />
           </div>
-          <h2 className="text-lg font-bold text-text-primary mb-2">PDF Chat AI</h2>
+          <h2 className="text-lg font-bold text-text-primary mb-2">Green Book AI</h2>
           <p className="text-text-muted text-center max-w-xs text-sm">
             Upload a PDF and start chatting. Ask questions, get insights, and receive
             suggestions to improve your documents.
