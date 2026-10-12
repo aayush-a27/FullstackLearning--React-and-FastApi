@@ -32,14 +32,15 @@ class Settings(BaseSettings):
 
     # PDF Upload
     MAX_PDF_SIZE_MB: int = 50
-    UPLOAD_DIR: str = "uploads"  # used only when R2 isn't configured
+    UPLOAD_DIR: str = "uploads"  # used only when object storage isn't configured
 
-    # Cloudflare R2 for uploaded PDFs (see app/services/file_storage.py).
-    # Leave empty to keep files in UPLOAD_DIR instead.
-    R2_ACCOUNT_ID: str = ""
-    R2_ACCESS_KEY_ID: str = ""
-    R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET: str = ""
+    # S3-compatible object storage for uploaded PDFs (Backblaze B2, Cloudflare
+    # R2...; see app/services/file_storage.py). Leave empty to use UPLOAD_DIR.
+    S3_ENDPOINT_URL: str = ""  # e.g. https://s3.us-west-004.backblazeb2.com
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_BUCKET: str = ""
+    S3_REGION: str = ""  # optional; worked out from a B2 endpoint, else "auto"
 
     # AI Model API Keys (optional — set via .env)
     GOOGLE_API_KEY: str = ""

@@ -73,7 +73,7 @@ async def delete_account(
     await db.delete(current_user)  # chats, messages, PDFs cascade
     await db.flush()
 
-    # Remove the user's uploaded files (R2 or local disk)
+    # Remove the user's uploaded files (object storage or local disk)
     await delete_user_files(user_id)
 
     await invalidate(chat_list_key(user_id))

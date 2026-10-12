@@ -124,7 +124,7 @@ async def view_pdf(
     content = await read_pdf(pdf.storage_path)
     if content is None:
         # The record and its search index survive, but the file is gone — e.g.
-        # uploaded to local disk before R2 was set up, then wiped by a redeploy.
+        # uploaded to local disk before object storage was set up, then wiped.
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="The original file is no longer stored, so it can't be shown. "

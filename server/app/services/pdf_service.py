@@ -18,7 +18,7 @@ async def save_uploaded_pdf(
     user_id: uuid.UUID,
 ) -> PdfDocument:
     """
-    Store an uploaded PDF (R2 or local disk) and create its DB record.
+    Store an uploaded PDF (object storage or local disk) and create its DB record.
 
     Only the page count is read here — text extraction, chunking and embedding
     happen in the background (app/services/pdf_processing.py) so large uploads

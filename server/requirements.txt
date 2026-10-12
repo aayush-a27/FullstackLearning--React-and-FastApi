@@ -28,7 +28,7 @@ alembic==1.20.0
 # AI / LLM (Groq + Gemini via litellm)
 litellm==1.104.0
 
-# Uploaded PDF storage on Cloudflare R2 (S3-compatible)
+# Uploaded PDF storage on S3-compatible object storage (Backblaze B2, R2...)
 boto3==1.43.108
 
 # PDF text extraction
