@@ -6,6 +6,8 @@ import Loader from '../common/Loader';
 import axiosInstance from '../../api/axiosInstance';
 import { PDFS } from '../../api/endpoints';
 import { isPdfIndexing, isSummaryWriting } from '../../hooks/usePdfStatus';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import PdfCanvasViewer from './PdfCanvasViewer';
 
 /** Compact indexing state next to the file name. */
 function IndexingBadge({ pdf }) {
@@ -54,12 +56,18 @@ export default function PdfViewer() {
   const activePdf = pdfs.length > 0 ? pdfs[0] : null;
   const activePdfId = activePdf?.id;
 
+  // Phones can't show a PDF in an iframe (Android Chrome only offers an
+  // "Open" button, iOS Safari shows page one), so they get pdf.js instead.
+  const isMobile = useIsMobile();
+  const drawWithPdfjs = isMobile || navigator.pdfViewerEnabled === false;
+
   // An iframe can't send the Bearer token, so fetch the file with axios
   // and show it from a local blob URL instead.
   // Keyed by PDF id so a stale result from a previous PDF is never shown.
-  const [viewState, setViewState] = useState({ pdfId: null, url: null, error: null });
+  const [viewState, setViewState] = useState({ pdfId: null, url: null, bytes: null, error: null });
   const isCurrent = viewState.pdfId === activePdfId;
   const pdfViewUrl = isCurrent ? viewState.url : null;
+  const pdfBytes = isCurrent ? viewState.bytes : null;
   const loadError = isCurrent ? viewState.error : null;
 
   useEffect(() => {
@@ -69,10 +77,11 @@ export default function PdfViewer() {
 
     axiosInstance
       .get(PDFS.VIEW(activePdfId), { responseType: 'blob', timeout: 120000 })
-      .then(({ data }) => {
+      .then(async ({ data }) => {
+        const bytes = await data.arrayBuffer();
         if (cancelled) return;
         objectUrl = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-        setViewState({ pdfId: activePdfId, url: objectUrl, error: null });
+        setViewState({ pdfId: activePdfId, url: objectUrl, bytes, error: null });
       })
       .catch(async (err) => {
         let message = 'Could not load this PDF.';
@@ -86,7 +95,7 @@ export default function PdfViewer() {
           }
         }
         if (!cancelled) {
-          setViewState({ pdfId: activePdfId, url: null, error: message });
+          setViewState({ pdfId: activePdfId, url: null, bytes: null, error: message });
         }
       });
 
@@ -113,13 +122,15 @@ export default function PdfViewer() {
             </span>
           </div>
 
-          {/* PDF iframe */}
-          <div className="flex-1 p-2">
+          {/* PDF iframe, or pdf.js pages; min-h-0 lets the pages scroll inside */}
+          <div className="flex-1 min-h-0 p-2">
             {loadError ? (
               <div className="h-full flex items-center justify-center gap-2 text-xs text-danger">
                 <AlertCircle size={14} />
                 {loadError}
               </div>
+            ) : pdfBytes && drawWithPdfjs ? (
+              <PdfCanvasViewer data={pdfBytes} title={`PDF Viewer — ${activePdf.filename}`} />
             ) : pdfViewUrl ? (
               <iframe
                 src={pdfViewUrl}
