@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import Loader from '../common/Loader';
 
@@ -84,7 +84,7 @@ function PdfPage({ doc, pageNumber, aspectRatio, width, scrollRoot }) {
   );
 }
 
-export default function PdfCanvasViewer({ data, title }) {
+function PdfPages({ data, title }) {
   // State, not a ref: pages need the element during render (as their observer root)
   const [scrollEl, setScrollEl] = useState(null);
   const [state, setState] = useState({ doc: null, aspectRatio: null, error: null });
@@ -92,14 +92,17 @@ export default function PdfCanvasViewer({ data, title }) {
 
   // Load the document
   useEffect(() => {
-    let doc = null;
+    let loadingTask = null;
     let cancelled = false;
     loadPdfjs()
-      // pdf.js takes over (detaches) the buffer it's given, so hand it a copy;
-      // the caller's data must survive for the next time this panel opens
-      .then((pdfjs) => pdfjs.getDocument({ data: new Uint8Array(data.slice(0)) }).promise)
+      .then((pdfjs) => {
+        if (cancelled) throw new Error('closed before loading');
+        // pdf.js takes over (detaches) the buffer it's given, so hand it a copy;
+        // the caller's data must survive for the next time this panel opens
+        loadingTask = pdfjs.getDocument({ data: new Uint8Array(data.slice(0)) });
+        return loadingTask.promise;
+      })
       .then(async (loaded) => {
-        doc = loaded;
         // Placeholders use the first page's shape until each page is drawn
         const first = (await loaded.getPage(1)).getViewport({ scale: 1 });
         if (!cancelled) setState({ doc: loaded, aspectRatio: `${first.width} / ${first.height}`, error: null });
@@ -109,7 +112,9 @@ export default function PdfCanvasViewer({ data, title }) {
       });
     return () => {
       cancelled = true;
-      doc?.destroy();
+      // pdf.js 6 closes documents through the loading task (the document
+      // itself has no destroy() any more); this also stops an unfinished load
+      loadingTask?.destroy().catch(() => {});
     };
   }, [data]);
 
@@ -153,5 +158,43 @@ export default function PdfCanvasViewer({ data, title }) {
         ))
       )}
     </div>
+  );
+}
+
+function PdfError() {
+  return (
+    <div className="h-full flex items-center justify-center gap-2 text-xs text-danger">
+      <AlertCircle size={14} />
+      Could not display this PDF.
+    </div>
+  );
+}
+
+/**
+ * Keeps a pdf.js failure inside this panel. Without it, an error thrown by
+ * the viewer (even while closing, e.g. on a tab switch) unmounts the whole app
+ * and leaves a blank screen until reload.
+ */
+class PdfErrorBoundary extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('PDF viewer failed:', error);
+  }
+
+  render() {
+    return this.state.failed ? <PdfError /> : this.props.children;
+  }
+}
+
+export default function PdfCanvasViewer(props) {
+  return (
+    <PdfErrorBoundary>
+      <PdfPages {...props} />
+    </PdfErrorBoundary>
   );
 }
