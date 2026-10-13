@@ -111,6 +111,8 @@ export default function PdfUploader({ onClose, compact = false }) {
 
         dispatch(addPdf(data));
         dispatch(setUploading(false));
+        // Done — get out of the way (on failure it stays open to show the error)
+        onClose?.();
       } catch (err) {
         // Don't leave an orphaned upload behind if attaching it failed
         if (uploadedId) {
@@ -119,7 +121,7 @@ export default function PdfUploader({ onClose, compact = false }) {
         dispatch(setPdfError(getFriendlyError(err, "Couldn't upload this PDF. Please try again.")));
       }
     },
-    [dispatch, pdfs, activeChatId]
+    [dispatch, pdfs, activeChatId, onClose]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
