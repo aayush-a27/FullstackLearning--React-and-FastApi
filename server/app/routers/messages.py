@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, AsyncSessionLocal
 from app.schemas.message import MessageCreate, MessageResponse
@@ -167,12 +167,21 @@ async def _load_turn(db: AsyncSession, chat_id: UUID, user_id: UUID, data: Messa
     if not chat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
 
+    # Edit / try again: the model must not see the turn being replaced, or anything after it
+    replace_from = None
+    if data.replace_from_id:
+        anchor = await db.get(Message, data.replace_from_id)
+        if not anchor or anchor.chat_id != chat_id or anchor.role != "user":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+        replace_from = anchor.created_at
+
     prepared = await prepare_context(db, chat, data.content)
 
+    history_query = select(Message).where(Message.chat_id == chat_id)
+    if replace_from is not None:
+        history_query = history_query.where(Message.created_at < replace_from)
     history_rows = (
-        await db.execute(
-            select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at.asc())
-        )
+        await db.execute(history_query.order_by(Message.created_at.asc()))
     ).scalars().all()
     history = _trim_history(list(history_rows))
     history.append({"role": "user", "content": data.content})
@@ -186,7 +195,7 @@ async def _load_turn(db: AsyncSession, chat_id: UUID, user_id: UUID, data: Messa
         smart_switch_enabled=smart_switch,
         context_len=len(prepared.context),
     )
-    return prepared, history, model_id
+    return prepared, history, model_id, replace_from
 
 
 async def _save_turn(
@@ -196,18 +205,29 @@ async def _save_turn(
     answer: str,
     model_used: str,
     prepared: PreparedContext,
-) -> Message:
-    """Persist the user message and the assistant reply together."""
+    replace_from: datetime | None = None,
+) -> tuple[Message, Message]:
+    """
+    Persist the user message and the assistant reply together.
+    With `replace_from`, the replaced turn and everything after it are deleted in
+    the same transaction, so a failed retry never loses the old answer.
+    Returns (user_message, assistant_message).
+    """
     now = datetime.now(timezone.utc)
     async with AsyncSessionLocal() as db:
-        db.add(
-            Message(
-                chat_id=chat_id,
-                role="user",
-                content=question,
-                created_at=now - timedelta(milliseconds=1),
+        if replace_from is not None:
+            await db.execute(
+                delete(Message).where(
+                    Message.chat_id == chat_id, Message.created_at >= replace_from
+                )
             )
+        user_message = Message(
+            chat_id=chat_id,
+            role="user",
+            content=question,
+            created_at=now - timedelta(milliseconds=1),
         )
+        db.add(user_message)
         ai_message = Message(
             chat_id=chat_id,
             role="assistant",
@@ -222,11 +242,12 @@ async def _save_turn(
         if chat:
             chat.updated_at = now
         await db.commit()
+        await db.refresh(user_message)
         await db.refresh(ai_message)
 
     # New messages change both the history and the chat list's ordering
     await invalidate(messages_key(chat_id), chat_list_key(user_id))
-    return ai_message
+    return user_message, ai_message
 
 
 @router.get("", response_model=list[MessageResponse])
@@ -277,7 +298,9 @@ async def send_message(
     Send a user message and get an AI response.
     The AI model is selected based on smart switch or user preference.
     """
-    prepared, history, model_id = await _load_turn(db, chat_id, current_user.id, data)
+    prepared, history, model_id, replace_from = await _load_turn(
+        db, chat_id, current_user.id, data
+    )
 
     try:
         answer, model_used = await ai_service.get_response(
@@ -287,13 +310,18 @@ async def send_message(
         # Nothing is saved, so the user can simply retry
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
 
-    return await _save_turn(
-        chat_id, current_user.id, data.content, answer, model_used, prepared
+    _, ai_message = await _save_turn(
+        chat_id, current_user.id, data.content, answer, model_used, prepared, replace_from
     )
+    return ai_message
 
 
 def _sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+def _message_json(message: Message) -> dict:
+    return json.loads(MessageResponse.model_validate(message).model_dump_json())
 
 
 @router.post("/stream", dependencies=[Depends(rate_limited(MESSAGE_LIMIT))])
@@ -307,10 +335,21 @@ async def stream_message(
     Same as POST /messages, but streams the answer as Server-Sent Events so the
     user sees it being written instead of waiting for the whole response.
 
-    Events: `start`, `model`, `delta`, `done`, `error`.
+    Events: `start`, `model`, `delta`, `user` (the saved question), `done`, `error`.
     """
-    prepared, history, model_id = await _load_turn(db, chat_id, current_user.id, data)
+    prepared, history, model_id, replace_from = await _load_turn(
+        db, chat_id, current_user.id, data
+    )
     user_id = current_user.id
+
+    async def save(answer: str, model_used: str):
+        """Save the turn, then send the saved question and answer back."""
+        user_message, ai_message = await _save_turn(
+            chat_id, user_id, data.content, answer, model_used, prepared, replace_from
+        )
+        # The client only had a temporary id for the question; editing it later needs the real one
+        yield _sse("user", _message_json(user_message))
+        yield _sse("done", _message_json(ai_message))
 
     async def event_stream():
         yield _sse("start", {"mode": prepared.mode, "sources": prepared.sources})
@@ -329,10 +368,8 @@ async def stream_message(
         except AIServiceError as e:
             if pieces:
                 # Partial answer — keep what the user already saw
-                saved = await _save_turn(
-                    chat_id, user_id, data.content, "".join(pieces), model_used, prepared
-                )
-                yield _sse("done", json.loads(MessageResponse.model_validate(saved).model_dump_json()))
+                async for event in save("".join(pieces), model_used):
+                    yield event
             else:
                 yield _sse("error", {"detail": str(e)})
             return
@@ -341,10 +378,8 @@ async def stream_message(
             yield _sse("error", {"detail": "Something went wrong. Please try again."})
             return
 
-        saved = await _save_turn(
-            chat_id, user_id, data.content, "".join(pieces), model_used, prepared
-        )
-        yield _sse("done", json.loads(MessageResponse.model_validate(saved).model_dump_json()))
+        async for event in save("".join(pieces), model_used):
+            yield event
 
     return StreamingResponse(
         event_stream(),

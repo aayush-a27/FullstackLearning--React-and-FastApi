@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { FileText, Sparkles } from 'lucide-react';
 import ChatBubble from './ChatBubble';
+import { useChat } from '../../hooks/useChat';
 import Loader from '../common/Loader';
 import { PdfPreparingCard } from './PdfProcessingStatus';
 import { isPdfIndexing } from '../../hooks/usePdfStatus';
@@ -12,7 +13,11 @@ export default function ChatArea() {
     (state) => state.chat
   );
   const preparing = useSelector((state) => state.pdf.pdfs.some(isPdfIndexing));
+  const { resendFrom, retryAnswer } = useChat();
   const bottomRef = useRef(null);
+  // Same rule as the input box: no new answers while one streams or a PDF is indexing
+  const actionsDisabled = isStreaming || preparing;
+  const lastIndex = messages.length - 1;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -58,8 +63,20 @@ export default function ChatArea() {
       ) : (
         /* Messages list */
         <div className="space-y-4">
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} isStreaming={isStreaming && msg === messages[messages.length - 1] && msg.role === 'assistant'} />
+          {messages.map((msg, index) => (
+            <ChatBubble
+              key={msg.id}
+              message={msg}
+              isStreaming={isStreaming && index === lastIndex && msg.role === 'assistant'}
+              actionsDisabled={actionsDisabled}
+              // Try again only on the latest answer, so it never wipes later turns
+              onRetry={
+                msg.role === 'assistant' && index === lastIndex ? () => retryAnswer(index) : undefined
+              }
+              onEdit={msg.role === 'user' ? (text) => resendFrom(index, text) : undefined}
+              // More than this message's own answer would be replaced
+              replacesLater={index < lastIndex - 1}
+            />
           ))}
           <div ref={bottomRef} />
         </div>

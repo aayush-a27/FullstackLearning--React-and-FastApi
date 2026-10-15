@@ -17,6 +17,8 @@ import {
   setMessages,
   setLoadingMessages,
   addMessage,
+  replaceMessage,
+  truncateMessages,
   replaceLastMessage,
   patchLastMessage,
   updateLastMessage,
@@ -153,7 +155,11 @@ export function useChat() {
     }
   };
 
-  const sendMessage = async (chatId, content, modelId, smartSwitch) => {
+  /**
+   * `replaceFromId`: the saved user message this one replaces (edit / try again).
+   * The server drops it and everything after it once the new answer is saved.
+   */
+  const sendMessage = async (chatId, content, modelId, smartSwitch, { replaceFromId } = {}) => {
     let targetChatId = chatId;
 
     // Create chat on the fly if it doesn't exist
@@ -177,6 +183,7 @@ export function useChat() {
       role: 'user',
       content,
       created_at: new Date().toISOString(),
+      local: true, // not saved yet; swapped for the server's copy when the answer is saved
     };
     dispatch(addMessage(userMsg));
 
@@ -192,7 +199,12 @@ export function useChat() {
     dispatch(addMessage(aiPlaceholder));
     dispatch(setStreaming(true));
 
-    const payload = { content, model_id: modelId, smart_switch: smartSwitch };
+    const payload = {
+      content,
+      model_id: modelId,
+      smart_switch: smartSwitch,
+      ...(replaceFromId ? { replace_from_id: replaceFromId } : {}),
+    };
     let received = false;
 
     try {
@@ -208,6 +220,8 @@ export function useChat() {
           } else if (name === 'delta') {
             received = true;
             dispatch(updateLastMessage(data.text));
+          } else if (name === 'user') {
+            dispatch(replaceMessage({ id: userMsg.id, message: data }));
           } else if (name === 'done') {
             dispatch(replaceLastMessage(data));
           } else if (name === 'error') {
@@ -230,6 +244,28 @@ export function useChat() {
     }
   };
 
+  /**
+   * Resend the user message at `index` (optionally with new text), replacing it
+   * and everything after it. Used by Edit and Try again.
+   */
+  const resendFrom = (index, content) => {
+    const anchor = messages[index];
+    if (!anchor || anchor.role !== 'user' || isStreaming || !activeChatId) return;
+    const { selectedModel, smartSwitchEnabled } = store.getState().model;
+    dispatch(truncateMessages(index));
+    // A question that never got saved (its answer failed) has nothing to replace on the server
+    return sendMessage(activeChatId, content, selectedModel?.id, smartSwitchEnabled, {
+      replaceFromId: anchor.local ? null : anchor.id,
+    });
+  };
+
+  /** Ask the question behind the assistant message at `index` again. */
+  const retryAnswer = (index) => {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (messages[i].role === 'user') return resendFrom(i, messages[i].content);
+    }
+  };
+
   return {
     chats,
     activeChatId,
@@ -244,5 +280,7 @@ export function useChat() {
     deleteChat,
     selectChat,
     sendMessage,
+    resendFrom,
+    retryAnswer,
   };
 }

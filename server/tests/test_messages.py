@@ -74,6 +74,83 @@ async def test_streaming_sends_events_and_saves_the_answer(auth_client):
     assert history[-1]["content"] == "".join(deltas)
 
 
+async def _stream_events(client, chat_id, body) -> dict:
+    """POST to the stream endpoint and return {event name: last payload}."""
+    events, name = {}, None
+    async with client.stream("POST", f"/chats/{chat_id}/messages/stream", json=body) as response:
+        assert response.status_code == 200
+        async for line in response.aiter_lines():
+            if line.startswith("event: "):
+                name = line[7:].strip()
+            elif line.startswith("data: "):
+                events[name] = json.loads(line[6:])
+    return events
+
+
+async def test_editing_a_message_replaces_it_and_everything_after(auth_client, monkeypatch):
+    from app.services import ai_service as ai_module
+
+    chat_id = (await auth_client.post("/chats", json={"title": "Edit"})).json()["id"]
+    await auth_client.post(f"/chats/{chat_id}/messages", json={"content": "First"})
+    await auth_client.post(f"/chats/{chat_id}/messages", json={"content": "Second"})
+    first = (await auth_client.get(f"/chats/{chat_id}/messages")).json()[0]
+
+    seen = []
+
+    async def recording_get_response(self, model_id, messages, pdf_context=""):
+        seen.append(messages)
+        return f"Stub answer for: {messages[-1]['content']}", model_id
+
+    monkeypatch.setattr(ai_module.AIService, "get_response", recording_get_response)
+
+    response = await auth_client.post(
+        f"/chats/{chat_id}/messages",
+        json={"content": "First, edited", "replace_from_id": first["id"]},
+    )
+    assert response.status_code == 201
+
+    # The model saw only the edited question, not the turns being replaced
+    assert seen[-1] == [{"role": "user", "content": "First, edited"}]
+    history = (await auth_client.get(f"/chats/{chat_id}/messages")).json()
+    assert [m["content"] for m in history] == ["First, edited", "Stub answer for: First, edited"]
+
+
+async def test_streaming_returns_the_saved_question_and_supports_try_again(auth_client):
+    chat_id = (await auth_client.post("/chats", json={"title": "Retry"})).json()["id"]
+
+    events = await _stream_events(auth_client, chat_id, {"content": "Question"})
+    saved_question = events["user"]
+    assert saved_question["role"] == "user" and saved_question["content"] == "Question"
+
+    # Try again = resend the same question, replacing the saved one by its real id
+    await _stream_events(
+        auth_client, chat_id, {"content": "Question", "replace_from_id": saved_question["id"]}
+    )
+    history = (await auth_client.get(f"/chats/{chat_id}/messages")).json()
+    assert [m["role"] for m in history] == ["user", "assistant"]
+    assert history[0]["id"] != saved_question["id"]
+
+
+async def test_replace_from_must_be_a_user_message_in_the_same_chat(auth_client):
+    chat_a = (await auth_client.post("/chats", json={"title": "A"})).json()["id"]
+    chat_b = (await auth_client.post("/chats", json={"title": "B"})).json()["id"]
+    await auth_client.post(f"/chats/{chat_a}/messages", json={"content": "In A"})
+    question, answer = (await auth_client.get(f"/chats/{chat_a}/messages")).json()
+
+    other_chat = await auth_client.post(
+        f"/chats/{chat_b}/messages", json={"content": "x", "replace_from_id": question["id"]}
+    )
+    assert other_chat.status_code == 404
+
+    not_a_question = await auth_client.post(
+        f"/chats/{chat_a}/messages", json={"content": "x", "replace_from_id": answer["id"]}
+    )
+    assert not_a_question.status_code == 404
+
+    # Nothing was deleted by the rejected requests
+    assert len((await auth_client.get(f"/chats/{chat_a}/messages")).json()) == 2
+
+
 def test_trim_history_respects_the_message_limit():
     messages = [
         Message(chat_id=uuid.uuid4(), role="user", content=f"message {i}")

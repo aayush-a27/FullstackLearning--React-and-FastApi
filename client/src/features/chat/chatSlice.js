@@ -48,6 +48,16 @@ const chatSlice = createSlice({
     addMessage(state, action) {
       state.messages.push(action.payload);
     },
+    /** Swap one message (found by id) for another, e.g. a temporary one for the saved one. */
+    replaceMessage(state, action) {
+      const { id, message } = action.payload;
+      const index = state.messages.findIndex((m) => m.id === id);
+      if (index !== -1) state.messages[index] = message;
+    },
+    /** Drop the message at `index` and everything after it (edit / try again). */
+    truncateMessages(state, action) {
+      state.messages = state.messages.slice(0, action.payload);
+    },
     replaceLastMessage(state, action) {
       if (state.messages.length > 0) {
         state.messages[state.messages.length - 1] = action.payload;
@@ -82,6 +92,8 @@ export const {
   setMessages,
   setLoadingMessages,
   addMessage,
+  replaceMessage,
+  truncateMessages,
   replaceLastMessage,
   patchLastMessage,
   updateLastMessage,
